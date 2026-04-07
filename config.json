@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "lightweight-ai-automation-framework",
+    "debug": true
+  },
+  "input": {
+    "maxLength": 640000
+  },
+  "output": {
+    "maxLength": 640000
+  },
+  "llm": {
+    "provider": "ollama",
+    "baseUrl": "http://127.0.0.1:11434",
+    "model": "gpt-oss:20b",
+    "timeoutMs": 120000,
+    "maxInputChars": 20000,
+    "maxOutputTokens": 4000,
+    "apiKey": "",
+    "isReasoningModel": true,
+    "reasoningStripMode": "auto"
+  },
+  "sqlite": {
+    "path": "./data/tasks.db"
+  }
+}
