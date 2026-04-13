@@ -1,6 +1,6 @@
 # AI Automation Framework
 
-A lightweight, program-controlled AI automation framework built with Node.js. This framework allows AI to fill specific parts of a workflow while maintaining strict program validation and control.
+A lightweight, program-controlled(Harness) AI automation framework built with Node.js. This framework allows AI to fill specific parts of a workflow while maintaining strict program validation and control.
 
 ## Features
 
