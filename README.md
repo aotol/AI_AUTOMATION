@@ -103,7 +103,7 @@ For input: "Fetch https://example.com, extract text, and summarize it"
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone [https://github.com/aotol/AI_AUTOMATION.git](https://github.com/aotol/AI_AUTOMATION.git)
 cd ai-automation
 ```
 
