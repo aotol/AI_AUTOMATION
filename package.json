@@ -7,6 +7,9 @@
     "start": "node src/app.js"
   },
   "dependencies": {
+    "imap-simple": "^5.1.0",
+    "mailparser": "^3.9.8",
+    "nodemailer": "^8.0.5",
     "sqlite3": "^5.1.6"
   },
   "engines": {

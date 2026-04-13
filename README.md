@@ -120,9 +120,14 @@ ollama pull llama3.2:3b  # or your preferred model
 
 4. Configure the application:
 ```bash
-cp config.json.example config.json
 # Edit config.json with your settings
 ```
+
+**Email Configuration** (if using email skills):
+- Yahoo Mail IMAP: `imap.mail.yahoo.com:993`
+- Yahoo Mail SMTP: `smtp.mail.yahoo.com:465`
+- Gmail IMAP: `imap.gmail.com:993` (requires 2FA app password)
+- Gmail SMTP: `smtp.gmail.com:465` (requires 2FA app password)
 
 ## Configuration
 
@@ -148,11 +153,35 @@ Edit `config.json`:
   },
   "output": {
     "maxLength": 50000
+  },
+  "email": {
+    "provider": "smtp",
+    "smtp": {
+      "name": "AI Automation Framework",
+      "host": "smtp.mail.yahoo.com",
+      "port": 465,
+      "secure": true,
+      "auth": {
+        "user": "your-email@yahoo.com",
+        "pass": "your-app-password"
+      }
+    },
+    "imap": {
+      "user": "your-email@yahoo.com",
+      "pass": "your-app-password",
+      "host": "imap.mail.yahoo.com",
+      "port": 993,
+      "tls": true
+    }
   }
 }
 ```
 
-## Usage
+**Email Setup Notes:**
+- Use app-specific passwords for Yahoo Mail and Gmail (not your regular password)
+- For Gmail, enable 2FA and generate an app password
+- For Yahoo Mail, generate an app password from Account Security settings
+- The `pass` field is used for both SMTP and IMAP authentication
 
 ### Basic Usage
 
@@ -214,10 +243,12 @@ This keeps the system abstract and avoids hardcoding payload values for every in
 ## Built-in Skills
 
 - **fetch_url**: Downloads webpage content from a URL
-- **extract_text_from_htmll**: Strips HTML tags to get readable text
+- **extract_text_from_html**: Strips HTML tags to get readable text
 - **detect_language**: Identifies the language of text
 - **translate_text**: Translates text to target language
 - **summarize_text**: Creates concise summaries
+- **receive_email**: Retrieves latest emails from IMAP inbox
+- **send_email**: Sends emails via SMTP
 - **format_output**: Structures final output as JSON
 
 ## API Reference

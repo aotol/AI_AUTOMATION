@@ -22,5 +22,25 @@
   },
   "sqlite": {
     "path": "./data/tasks.db"
+  },
+  "email": {
+    "provider": "smtp",
+    "smtp": {
+      "name": "AI Automation Framework",
+      "host": "<smtp host>",
+      "port": 465,
+      "secure": true,
+      "auth": {
+        "user": "<email user>",
+        "pass": "<email app passcode>"
+      }
+    },
+    "imap": {
+      "user": "<email user>",
+      "password": "<email app passcode>",
+      "host": "<imap host>",
+      "port": 993,
+      "tls": true
+    }
   }
 }
