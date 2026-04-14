@@ -4,7 +4,7 @@ function validatePlannedSkillNames(skillNames) {
   const errors = [];
 
   if (!Array.isArray(skillNames) || skillNames.length === 0) {
-    errors.push('Plan must be a non-empty array of skill names.');
+    errors.push('AI_AUTOMATION does not have enough skill to carry out this task.');
     return { valid: false, errors };
   }
 
