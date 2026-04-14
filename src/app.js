@@ -1,7 +1,7 @@
 const TaskRepository = require('./task-repository');
 const TaskEngine = require('./task-engine');
 const inputProvider = require('./input-provider');
-const { logInfo, logError } = require('./logger');
+const { logInfo, logError, logDebug } = require('./logger');
 const llmProvider = require('./llm-provider');
 const promptBuilder = require('./prompt-builder');
 const { config } = require('./config');
@@ -17,7 +17,7 @@ async function main() {
       taskRepository,
       llmProvider,
       promptBuilder,
-      logger: { logInfo, logError }
+      logger: { logInfo, logError, logDebug }
     };
 
     const rawInput = inputProvider.getUserInput();

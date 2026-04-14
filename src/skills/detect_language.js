@@ -7,8 +7,25 @@ module.exports = {
     description: 'Detect the language of the given text and return the language code (e.g., en, zh, fr).',
     execute: async (context, services, stepDefinition) => {
         const { findPreviousOutputByKey } = require('../skill-utils');
-        const sourceText = stepDefinition.payload && typeof stepDefinition.payload.text === 'string' && stepDefinition.payload?.text?.trim() != ''
-        ? stepDefinition.payload.text : findPreviousOutputByKey(context, "text");
+        let sourceText;
+        let sourceTextFromPayload = stepDefinition.payload && typeof stepDefinition.payload.text === 'string' && stepDefinition.payload?.text?.trim() != '' ? stepDefinition.payload.text : null;
+        let sourceTextFromContext = findPreviousOutputByKey(context, "text");
+        if (!sourceTextFromContext || sourceTextFromContext.trim() == '') {
+            sourceTextFromContext = null;
+        }
+        if (stepDefinition.stepIndex === 0) {
+            //Prioritize payload source text if presented
+            sourceText = sourceTextFromPayload;
+            if (!sourceText) {
+                sourceText = sourceTextFromContext;
+            }
+        } else {
+            //Prioritize context source text if presented
+            sourceText = sourceTextFromContext;
+            if (!sourceText) {
+                sourceText = sourceTextFromPayload;
+            }
+        }
         if (!sourceText) {
             throw new Error('detect_language step requires payload.text or previous step output.');
         }

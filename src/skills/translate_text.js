@@ -3,7 +3,7 @@ const { findPreviousOutputByKey } = require('../skill-utils');
 module.exports = {
   stepName: 'translate_text',
   requiresAI: true,
-  payloadDefinition: {text: 'The text to translate.', targetLanguage: 'The language to translate into.'},
+  payloadDefinition: {text: 'The text to translate.', targetLanguage: 'The language name translate into.'},
   description: 'Translate text into a target language. Can use detected language from previous detect_language step to determine source language.',
   execute: async (context, services, stepDefinition) => {
     let sourceText;
@@ -30,12 +30,11 @@ module.exports = {
     }
 
     let targetLanguage = stepDefinition.payload && typeof stepDefinition.payload.targetLanguage === 'string'
-      ? stepDefinition.payload.targetLanguage
-      : null;
-
-    if (!targetLanguage) {
-      const detectedLanguageCode = findPreviousOutputByKey(context, 'languageCode');
-      const detectedLanguageName = findPreviousOutputByKey(context, 'languageName');
+    ? stepDefinition.payload.targetLanguage
+    : null;
+    const detectedLanguageCode = findPreviousOutputByKey(context, 'languageCode');
+    const detectedLanguageName = findPreviousOutputByKey(context, 'languageName');
+    if (!targetLanguage) {  
       if (detectedLanguageName && detectedLanguageName !== 'Unknown') {
         targetLanguage = detectedLanguageName;
       } else if (detectedLanguageCode && detectedLanguageCode !== 'unknown') {
@@ -59,7 +58,7 @@ module.exports = {
       }
     }
 
-    const prompt = `Translate the following text into ${targetLanguage} and return only the translated text.\n\nText:\n${sourceText}`;
+    const prompt = `Translate the following ${detectedLanguageName ? `${detectedLanguageName} ` : ''}text into ${targetLanguage} and return only the translated text.\n\nText:\n${sourceText}`;
     const translatedText = await services.llmProvider.generateText(prompt);
     return {
       text: translatedText,

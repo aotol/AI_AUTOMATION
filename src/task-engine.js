@@ -54,7 +54,7 @@ class TaskEngine {
             }
             await taskRepository.saveTaskPlan(taskId, plannedSkillNames);
             await taskRepository.updateTaskStatus(taskId, taskRepository.constructor.TASK_STATUS.PLAN_VALIDATED);
-            await taskRepository.addEvent(taskId, 'planning_validated');
+            await taskRepository.addEvent(taskId, 'planning_validated', plannedSkillNames);
             logger.logInfo('Plan validated successfully');
 
             // Secondly, build the plan detials
@@ -72,13 +72,19 @@ class TaskEngine {
                     //This skill requires parameter, now try to capture the parameter value from the rawInput (User input)
                     const fillPayloadParametersPrompt = promptBuilder.buildFillSkillParameterPrompt(rawInput, skill);
                     const filledPayloadParameters = await this.services.llmProvider.generateJson(fillPayloadParametersPrompt);
+                    logger.logDebug(`Filled payload: ${JSON.stringify(filledPayloadParameters)}`);
                     Object.keys(skill.payloadDefinition).forEach(function (key) {
-                        if (filledPayloadParameters && Object.prototype.hasOwnProperty.call(filledPayloadParameters, key)) {
-                            payload[key] = filledPayloadParameters[key];
-                        } else {
-                            //The value of the payload is yet avaiable, could becomes avaiallbe during execution
-                            logger.logInfo(`Missing key: ${key} when build execution plan ${index}.${skillName}. Need to provide the value during execution.`);
+                        try {
+                            if (filledPayloadParameters && Object.prototype.hasOwnProperty.call(filledPayloadParameters, key)) {
+                                payload[key] = filledPayloadParameters[key];
+                            } else {
+                                //The value of the payload is yet avaiable, could becomes avaiallbe during execution
+                                logger.logInfo(`Missing key: ${key} when build execution plan ${index}.${skillName}. Need to provide the value during execution.`);
+                            }
+                        } catch (error) {
+                            logger.logError(`Step building value assigning failed: ${error}`);
                         }
+                        
                     });
                 }
                 // Add more default payload logic here as needed
@@ -107,7 +113,7 @@ class TaskEngine {
                 };
             }
             await taskRepository.updateTaskStatus(taskId, taskRepository.constructor.TASK_STATUS.STEP_BUILDING_VALIDATED);
-            await taskRepository.addEvent(taskId, 'step_building_validated');
+            await taskRepository.addEvent(taskId, 'step_building_validated', steps);
             logger.logInfo('Step building validated successfully');
 
             //Thirdly, run the steps

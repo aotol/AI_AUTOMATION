@@ -45,7 +45,8 @@ Task: ${rawInput}
 Rules:
 - If you extracted a value for a required parameter, put it into JSON's object's root level.
 - If the task does not contains the value for required parameter, skip this parameter.
-- Do not add parameter that is not specified by the skill.
+- Do not add parameter that is not specified in the skill.
+- Only return JSON object, no other text.
 `;
   return ensurePromptWithinLimit(prompt);
 }
@@ -67,7 +68,6 @@ CRITICAL RULES:
 Example for "Fetch https://example.com, extract text, detect language, and summarize":
 ["fetch_url", "extract_text_from_html", "detect_language", "summarize_text", "format_output"]
 
-Start your response with [ and end with ]. No other text.
 Task: ${task}
 `;
   return ensurePromptWithinLimit(prompt);
