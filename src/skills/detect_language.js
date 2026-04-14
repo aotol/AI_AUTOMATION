@@ -6,42 +6,9 @@ module.exports = {
     },
     description: 'Detect the language of the given text and return the language code (e.g., en, zh, fr).',
     execute: async (context, services, stepDefinition) => {
-        let sourceText = null;
-        if (
-            stepDefinition.payload &&
-            typeof stepDefinition.payload.text === "string"
-        ) {
-            sourceText = stepDefinition.payload.text;
-        } else {
-            const reversedStepResults = context.stepResults.slice().reverse();
-
-            for (const step of reversedStepResults) {
-                if (step.output && typeof step.output === "object") {
-                    if (step.output.text) {
-                        sourceText = step.output.text;
-                        break;
-                    }
-
-                    if (step.output.translatedText) {
-                        sourceText = step.output.translatedText;
-                        break;
-                    }
-
-                    if (step.output.summaryText) {
-                        sourceText = step.output.summaryText;
-                        break;
-                    }
-
-                    if (step.output.content) {
-                        sourceText = step.output.content;
-                        break;
-                    }
-
-                    sourceText = step.output;
-                    break;
-                }
-            }
-        }
+        const { findPreviousOutputByKey } = require('../skill-utils');
+        const sourceText = stepDefinition.payload && typeof stepDefinition.payload.text === 'string' && stepDefinition.payload?.text?.trim() != ''
+        ? stepDefinition.payload.text : findPreviousOutputByKey(context, "text");
         if (!sourceText) {
             throw new Error('detect_language step requires payload.text or previous step output.');
         }

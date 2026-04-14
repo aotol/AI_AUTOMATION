@@ -15,8 +15,11 @@ module.exports = {
     const {
       config
     } = require('../config');
-    const emailCount = (stepDefinition.payload && stepDefinition.payload.count) || 1;
-
+    const { findPreviousOutputByKey } = require('../skill-utils');
+    let emailCount = stepDefinition.payload ? stepDefinition.payload.count : findPreviousOutputByKey(context, "count");
+    if (!emailCount) {
+      emailCount = 1;
+    }
     if (!Number.isInteger(emailCount) || emailCount < 1) {
       throw new Error('receive_email count must be a positive integer');
     }
@@ -102,8 +105,6 @@ module.exports = {
       throw err;
     }
   },
-
-
   validate: async (context, result, stepDefinition) => {
     const errors = [];
 

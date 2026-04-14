@@ -1,32 +1,5 @@
 const skills = require('./skills-loader');
 
-function validateAnalysis(analysis) {
-  const errors = [];
-
-  if (!analysis || typeof analysis !== 'object' || Array.isArray(analysis)) {
-    errors.push('Analysis result must be an object.');
-    return { valid: false, errors };
-  }
-
-  if (!analysis.taskType || typeof analysis.taskType !== 'string') {
-    errors.push('taskType is required and must be a string.');
-  }
-
-  if (!analysis.goal || typeof analysis.goal !== 'string') {
-    errors.push('goal is required and must be a string.');
-  }
-
-  if (typeof analysis.canDo !== 'boolean') {
-    errors.push('canDo is required and must be a boolean.');
-  }
-
-  if (!analysis.inputs || typeof analysis.inputs !== 'object' || Array.isArray(analysis.inputs)) {
-    errors.push('inputs is required and must be an object.');
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
 function validatePlannedSkillNames(skillNames) {
   const errors = [];
 
@@ -49,6 +22,31 @@ function validatePlannedSkillNames(skillNames) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateStepBuilding(steps) {
+  const errors = [];
+
+  if (!Array.isArray(steps) || steps.length === 0) {
+    errors.push('Step building result must be a non-empty array of steps.');
+    return { valid: false, errors };
+  }
+  let count = 0;
+  for (const step of steps) {
+    if (step.stepIndex != count) {
+      errors.push(`Step ${count}'s stepIndx is not in sequential incremental (${step.stepIndex})`);
+    }
+    if (typeof step.stepName !== 'string') {
+      errors.push(`Each step ${count}'s name must be a string.`);
+    }
+    if (!skills.hasStep(step.stepName)) {
+      errors.push(`Step ${count}'s skill '${step.stepName}' is not supported by the implementation registry.`);
+    }
+    count++;
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+
 function validateStepResult(result) {
   if (result === undefined || result === null) {
     return { valid: false, errors: ['Step result must not be empty.'] };
@@ -62,7 +60,7 @@ function validateStepResult(result) {
 }
 
 module.exports = {
-  validateAnalysis,
   validatePlannedSkillNames,
+  validateStepBuilding,
   validateStepResult
 };

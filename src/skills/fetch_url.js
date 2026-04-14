@@ -4,16 +4,18 @@ module.exports = {
   payloadDefinition: {url: 'The target URL to fetch.'},
   description: 'Fetch and download the page content from a given URL.',
   execute: async (context, services, stepDefinition) => {
-    const url = stepDefinition.payload && stepDefinition.payload.url;
-    if (!url || typeof url !== 'string') {
+    const { findPreviousOutputByKey } = require('../skill-utils');
+    const url = stepDefinition.payload && typeof stepDefinition.payload.url === 'string'
+        ? stepDefinition.payload.url : findPreviousOutputByKey(context, "url");
+    if (!url || typeof url !== 'string' || url.trim() == '') {
       throw new Error('fetch_url step requires payload.url');
     }
     const response = await fetch(url);
-    const content = await response.text();
+    const html = await response.text();
     return {
       url,
       status: response.status,
-      content,
+      html,
       contentType: response.headers.get('content-type') || null
     };
   },
@@ -25,8 +27,8 @@ module.exports = {
     if (!result.url || typeof result.url !== 'string') {
       errors.push('fetch_url result must include url string.');
     }
-    if (!result.content || typeof result.content !== 'string') {
-      errors.push('fetch_url result must include content string.');
+    if (!result.html || typeof result.html !== 'string') {
+      errors.push('fetch_url result must include html string.');
     }
     return { valid: errors.length === 0, errors };
   }

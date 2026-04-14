@@ -15,7 +15,7 @@ A lightweight, program-controlled(Harness) AI automation framework built with No
 
 ### Core Components
 
-- **Task Engine**: Orchestrates the analysis → planning → execution workflow
+- **Task Engine**: Orchestrates the planning → building steps → execution workflow
 - **Skill Registry**: Dynamic loading of atomic skills from `src/skills/` directory
 - **LLM Provider**: Handles communication with Ollama API
 - **Task Repository**: SQLite-based persistence with state machine validation
@@ -33,56 +33,44 @@ Skills are atomic, reusable capabilities that can be combined to solve complex t
 
 ### Workflow
 
-1. **Analysis**: AI analyzes user input and determines task type/goal
-2. **Planning**: AI selects and orders skills needed to complete the task (returns array of skill names)
-3. **Execution**: Program executes skills sequentially, validating each step
+1. **Planning**: AI analyzes user input and selects & orders the skills needed to complete the task (returns array of skill names)
+2. **Building Steps**: AI fills in the parameters required by each planned skill based on user input and payload definitions
+3. **Execution**: Program executes skills sequentially with filled parameters, validating each step
 4. **Output**: Final structured result
 
 ### Example
 
 For input: "Fetch https://example.com, extract text, and summarize it"
 
-1. **Analysis** (AI-generated JSON):
-```json
-{
-  "taskType": "generic_task",
-  "goal": "Fetch page, extract text, and summarize",
-  "canDo": true,
-  "inputs": {
-    "url": "https://example.com"
-  }
-}
-```
-
-2. **Planning** (AI-generated array):
+1. **Planning Phase** (AI-generated array of skills):
 ```json
 ["fetch_url", "extract_text_from_html", "summarize_text", "format_output"]
 ```
 
-3. **Execution Plan** (Program-built from array):
+2. **Building Steps Phase** (AI fills in parameters for each skill):
 ```json
 {
   "steps": [
     {
-      "stepIndex": 1,
+      "stepIndex": 0,
       "stepName": "fetch_url",
       "requiresAI": false,
       "payload": { "url": "https://example.com" }
     },
     {
-      "stepIndex": 2,
+      "stepIndex": 1,
       "stepName": "extract_text_from_html",
       "requiresAI": false,
       "payload": {}
     },
     {
-      "stepIndex": 3,
+      "stepIndex": 2,
       "stepName": "summarize_text",
       "requiresAI": true,
-      "payload": {}
+      "payload": { "maxLength": "200 words" }
     },
     {
-      "stepIndex": 4,
+      "stepIndex": 3,
       "stepName": "format_output",
       "requiresAI": false,
       "payload": {}
@@ -90,6 +78,8 @@ For input: "Fetch https://example.com, extract text, and summarize it"
   ]
 }
 ```
+
+3. **Execution Phase** (Program executes each step sequentially with filled parameters, validating results)
 
 ## Installation
 
@@ -234,9 +224,9 @@ module.exports = {
 ## Skill payloadDefinition and dynamic payload assignment
 
 - Each skill may define a `payloadDefinition` object that lists the expected payload keys and their descriptions.
-- `buildAnalysisPrompt()` uses `payloadDefinition` to tell the LLM which parameters it should try to extract from the user request.
-- `TaskEngine` then dynamically fills these payload fields from `analysis.inputs` when creating the execution plan.
-- If a parameter is not available from the analysis, the step implementation can still derive it from prior step outputs.
+- `buildFillSkillParameterPrompt()` uses `payloadDefinition` to tell the LLM which parameters it should try to extract from the user input for each step.
+- During the Building Steps phase, the LLM is prompted to fill in these payload fields based on the user's raw input and the skill's parameter requirements.
+- If a parameter is not available from the user input, the step implementation can still derive it from prior step outputs using `findPreviousOutputForPayload()`.
 
 This keeps the system abstract and avoids hardcoding payload values for every individual use case.
 

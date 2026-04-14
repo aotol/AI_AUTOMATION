@@ -15,28 +15,57 @@ class TaskRepository {
     this.allAsync = promisify(this.db.all.bind(this.db));
   }
 
+  // Task Status Constants
+  static TASK_STATUS = {
+    RECEIVED: 'received',
+    PLANNING: 'planning',
+    PLAN_VALIDATED: 'plan_validated',
+    PLAN_FAILED: 'plan_failed',
+    STEP_BUILDING: 'step_building',
+    STEP_BUILDING_FAILED: 'step_building_failed',
+    STEP_BUILDING_VALIDATED: 'step_building_validated',
+    EXECUTING: 'executing',
+    COMPLETED: 'completed',
+    FAILED: 'failed'
+  };
+
+  // Step Status Constants
+  static STEP_STATUS = {
+    PENDING: 'pending',
+    RUNNING: 'running',
+    COMPLETED: 'completed',
+    VALIDATION_FAILED: 'validation_failed',
+    FAILED: 'failed'
+  };
+
+  /**
+   * Defines each step and allowed next step
+   * @returns 
+   */
   static getTaskStatusTransitions() {
+    const S = TaskRepository.TASK_STATUS;
     return {
-      received: ['analyzing'],
-      analyzing: ['analysis_validated', 'analysis_failed'],
-      analysis_validated: ['planning'],
-      planning: ['plan_validated', 'plan_failed'],
-      plan_validated: ['executing'],
-      executing: ['completed', 'failed'],
-      completed: [],
-      failed: [],
-      analysis_failed: [],
-      plan_failed: []
+      [S.RECEIVED]: [S.PLANNING],
+      [S.PLANNING]: [S.PLAN_VALIDATED, S.PLAN_FAILED],
+      [S.PLAN_VALIDATED]: [S.STEP_BUILDING],
+      [S.STEP_BUILDING]: [S.STEP_BUILDING_VALIDATED, S.STEP_BUILDING_FAILED],
+      [S.STEP_BUILDING_VALIDATED]: [S.EXECUTING],
+      [S.EXECUTING]: [S.COMPLETED, S.FAILED],
+      [S.COMPLETED]: [],
+      [S.FAILED]: [],
+      [S.PLAN_FAILED]: [],
+      [S.STEP_BUILDING_FAILED]: []
     };
   }
 
   static getStepStatusTransitions() {
+    const S = TaskRepository.STEP_STATUS;
     return {
-      pending: ['running', 'failed'],
-      running: ['completed', 'validation_failed', 'failed'],
-      completed: [],
-      validation_failed: [],
-      failed: []
+      [S.PENDING]: [S.RUNNING, S.FAILED],
+      [S.RUNNING]: [S.COMPLETED, S.VALIDATION_FAILED, S.FAILED],
+      [S.COMPLETED]: [],
+      [S.VALIDATION_FAILED]: [],
+      [S.FAILED]: []
     };
   }
 
@@ -74,7 +103,6 @@ class TaskRepository {
       task_id TEXT PRIMARY KEY,
       raw_input TEXT NOT NULL,
       status TEXT NOT NULL,
-      analysis_json TEXT,
       plan_json TEXT,
       final_output_json TEXT,
       error_message TEXT,
@@ -109,7 +137,7 @@ class TaskRepository {
     const now = new Date().toISOString();
     await this.runAsync(
       `INSERT INTO tasks (task_id, raw_input, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-      [taskId, rawInput, 'received', now, now]
+      [taskId, rawInput, TaskRepository.TASK_STATUS.RECEIVED, now, now]
     );
   }
 
@@ -119,15 +147,6 @@ class TaskRepository {
     await this.runAsync(
       `UPDATE tasks SET status = ?, updated_at = ? WHERE task_id = ?`,
       [status, now, taskId]
-    );
-  }
-
-  async saveTaskAnalysis(taskId, analysis) {
-    const payload = JSON.stringify(analysis);
-    const now = new Date().toISOString();
-    await this.runAsync(
-      `UPDATE tasks SET analysis_json = ?, updated_at = ? WHERE task_id = ?`,
-      [payload, now, taskId]
     );
   }
 
@@ -161,7 +180,7 @@ class TaskRepository {
     return new Promise((resolve, reject) => {
       this.db.run(
         `INSERT INTO task_steps (task_id, step_index, step_name, requires_ai, status, input_json) VALUES (?, ?, ?, ?, ?, ?)`,
-        [taskId, stepIndex, stepName, requiresAI ? 1 : 0, 'pending', JSON.stringify(inputJson || {})],
+        [taskId, stepIndex, stepName, requiresAI ? 1 : 0, TaskRepository.STEP_STATUS.PENDING, JSON.stringify(inputJson || {})],
         function (error) {
           if (error) {
             return reject(error);
@@ -173,11 +192,11 @@ class TaskRepository {
   }
 
   async startStep(stepId) {
-    await this.validateStepStatusTransition(stepId, 'running');
+    await this.validateStepStatusTransition(stepId, TaskRepository.STEP_STATUS.RUNNING);
     const now = new Date().toISOString();
     await this.runAsync(
       `UPDATE task_steps SET status = ?, started_at = ? WHERE id = ?`,
-      ['running', now, stepId]
+      [TaskRepository.STEP_STATUS.RUNNING, now, stepId]
     );
   }
 

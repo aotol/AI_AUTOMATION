@@ -1,6 +1,6 @@
 {
   "name": "lightweight-ai-automation-framework",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Minimal program-controlled AI automation framework proof of concept.",
   "main": "src/app.js",
   "scripts": {

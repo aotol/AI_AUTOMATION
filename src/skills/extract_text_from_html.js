@@ -6,16 +6,24 @@ module.exports = {
   payloadDefinition: {html: 'The html code.'},
   description: 'Extract readable text from HTML content by stripping tags and scripts.',
   execute: async (context, services, stepDefinition) => {
-    let html = null;
-    if (stepDefinition.payload && typeof stepDefinition.payload.html === 'string') {
-      html = stepDefinition.payload.html;
+    const { findPreviousOutputByKey } = require('../skill-utils');
+    let html;
+    let htmlFromPayload = stepDefinition.payload && typeof stepDefinition.payload.html === 'string' && stepDefinition.payload?.html?.trim() != '' ? stepDefinition.payload.html : null;
+    let htmlFromContext = findPreviousOutputByKey(context, "html");
+    if (!htmlFromContext || htmlFromContext.trim() == '') {
+      htmlFromContext = null;
+    }
+    if (stepDefinition.stepIndex === 0) {
+      //Prioritize payload html if presented
+      html = htmlFromPayload;
+      if (!html) {
+        html = htmlFromContext;
+      }
     } else {
-      const previous = context.stepResults
-        .slice()
-        .reverse()
-        .find((step) => step.output && typeof step.output.content === 'string');
-      if (previous) {
-        html = previous.output.content;
+      //Prioritize context html if presented
+      html = htmlFromContext;
+      if (!html) {
+        html = htmlFromPayload;
       }
     }
     if (!html) {
@@ -23,7 +31,7 @@ module.exports = {
     }
     const text = stripHtml(html);
     return { text };
-  },
+  }, 
   validate: async (context, result, stepDefinition) => {
     const errors = [];
     if (!result || typeof result !== 'object') {

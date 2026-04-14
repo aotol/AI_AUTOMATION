@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 function findPreviousOutputText(context) {
   const candidate = context.stepResults
     .slice()
@@ -21,6 +24,18 @@ function findPreviousOutputByKey(context, key) {
   return candidate.output[key];
 }
 
+function findPreviousOutputForPayload(context, payloadDefinition) {
+  // For each key in the payload definition, try to find it in previous step outputs
+  const result = {};
+  for (const key of Object.keys(payloadDefinition)) {
+    const value = findPreviousOutputByKey(context, key);
+    if (value !== null) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 function stripHtml(html) {
   if (typeof html !== 'string') {
     return '';
@@ -36,5 +51,6 @@ function stripHtml(html) {
 module.exports = {
   findPreviousOutputText,
   findPreviousOutputByKey,
+  findPreviousOutputForPayload,
   stripHtml
 };

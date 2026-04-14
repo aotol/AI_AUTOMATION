@@ -3,12 +3,12 @@ module.exports = {
   requiresAI: false,
   payloadDefinition: {
     address: 'The recipient email address.',
-    subject: 'Email subject line (optional, will use task goal if not provided).'
+    subject: 'Email subject.'
   },
   description: 'Send email with task results to the specified recipient.',
   
   execute: async (context, services, stepDefinition) => {
-    const { findPreviousOutputText } = require('../skill-utils');
+    const { findPreviousOutputByKey } = require('../skill-utils');
     const { config } = require('../config');
     const nodemailer = require('nodemailer');
     
@@ -19,13 +19,15 @@ module.exports = {
 
     // Get email subject from payload or use task goal
     const subject = (stepDefinition.payload && stepDefinition.payload.subject)
-      || context.analysis.goal
+      || context.rawInput
       || 'Task Results';
 
     // Get email body from previous step outputs
-    const emailBody = findPreviousOutputText(context) 
-      || JSON.stringify(context.stepResults.map(s => s.output), null, 2)
-      || 'No content to send.';
+
+    let emailBody = findPreviousOutputByKey(context, "text");
+    if (!emailBody || emailBody.trim() == '') {
+      emailBody  = JSON.stringify(context.stepResults.map(s => s.output), null, 2) || 'No content to send.';
+    }
 
     // Get SMTP config and sender info from config.json
     if (!config.email || !config.email.smtp) {
@@ -62,7 +64,6 @@ module.exports = {
       message: `Email sent successfully to ${recipientAddress}`
     };
   },
-
   validate: async (context, result, stepDefinition) => {
     const errors = [];
     
