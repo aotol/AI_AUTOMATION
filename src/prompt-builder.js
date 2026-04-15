@@ -44,9 +44,14 @@ Task: ${rawInput}
 
 Rules:
 - If you extracted a value for a required parameter, put it into JSON's object's root level.
+- The output JSON format is: {<skill parameter name>: <skill parameter value>}
 - If the task does not contains the value for required parameter, skip this parameter.
 - Do not add parameter that is not specified in the skill.
 - Only return JSON object, no other text.
+
+Example:
+If you extracted value for required parameters "param_1", "param_2" for skill "example_skill", your output JOSN should be:
+{"param_1": <param_1_value>, "param_2": <param_2_value>}
 `;
   return ensurePromptWithinLimit(prompt);
 }
