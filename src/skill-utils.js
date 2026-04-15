@@ -48,9 +48,38 @@ function stripHtml(html) {
     .trim();
 }
 
+
+async function getLanguageFromText(text) {
+  const { eld } = await import('eld/large');
+  let languageCode = "unknown";
+  let languageName = "unknown";
+  // Detect language
+  let parsed = eld.detect(text);
+  if (!parsed || !parsed.language) {
+
+  } else {
+    languageCode = parsed.language;
+    languageName = getLanguageNameFromLanguageCode(languageCode);
+  }
+  return {languageCode, languageName};
+}
+
+function getLanguageNameFromLanguageCode(languageCode) {
+  let languageName = 'unknown';
+  const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
+  try {
+    languageName = languageNames.of(languageCode);
+  } catch (e) {
+
+  }
+  return languageName;
+}
+
 module.exports = {
   findPreviousOutputText,
   findPreviousOutputByKey,
   findPreviousOutputForPayload,
-  stripHtml
+  stripHtml,
+  getLanguageFromText,
+  getLanguageNameFromLanguageCode
 };

@@ -10,7 +10,9 @@
     "imap-simple": "^5.1.0",
     "mailparser": "^3.9.8",
     "nodemailer": "^8.0.5",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "jsonrepair": "^3.13.3",
+    "eld": "^2.0.3"
   },
   "engines": {
     "node": ">=18"

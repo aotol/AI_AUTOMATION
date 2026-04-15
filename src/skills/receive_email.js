@@ -1,4 +1,5 @@
 const imaps = require('imap-simple');
+const { findPreviousOutputByKey } = require('../skill-utils');
 const {
   simpleParser
 } = require('mailparser');
@@ -15,7 +16,6 @@ module.exports = {
     const {
       config
     } = require('../config');
-    const { findPreviousOutputByKey } = require('../skill-utils');
     let emailCount = stepDefinition.payload ? stepDefinition.payload.count : findPreviousOutputByKey(context, "count");
     if (!emailCount) {
       emailCount = 1;

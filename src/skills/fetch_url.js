@@ -1,10 +1,10 @@
+const { findPreviousOutputByKey } = require('../skill-utils');
 module.exports = {
   stepName: 'fetch_url',
   requiresAI: false,
   payloadDefinition: {url: 'The target URL to fetch.'},
   description: 'Fetch and download the page content from a given URL.',
   execute: async (context, services, stepDefinition) => {
-    const { findPreviousOutputByKey } = require('../skill-utils');
     const url = stepDefinition.payload && typeof stepDefinition.payload.url === 'string'
         ? stepDefinition.payload.url : findPreviousOutputByKey(context, "url");
     if (!url || typeof url !== 'string' || url.trim() == '') {

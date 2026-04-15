@@ -250,7 +250,7 @@ class TaskEngine {
             };
         } catch (error) {
             const message = `Task failed: ${error.message}`;
-            await taskRepository.updateTaskStatus(taskId, taskRepository.constructor.constructor.TASK_STATUS.FAILED);
+            await taskRepository.updateTaskStatus(taskId, taskRepository.constructor.TASK_STATUS.FAILED);
             await taskRepository.addEvent(taskId, 'task_failed', {
                 error: message
             });

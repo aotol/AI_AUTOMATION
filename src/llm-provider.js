@@ -1,3 +1,5 @@
+const { jsonrepair } = require('jsonrepair');
+
 const { config } = require('./config');
 const { logDebug, logError } = require('./logger');
 
@@ -150,14 +152,27 @@ async function generateText(prompt) {
 
 async function generateJson(prompt) {
   const text = await generateText(prompt);
+  let result;
   try {
-    const parsed = JSON.parse(text);
+    //Remove unnecessary string outside of JSON
+    const firstIndex = text.indexOf("{");
+    result = firstIndex !== -1 ? text.substring(firstIndex) : text;
+    const lastIndex = result.lastIndexOf("}");
+    result = lastIndex !== -1 ? result.substring(0, lastIndex + 1) : result;
+    const parsed = JSON.parse(result);
     if (!parsed || typeof parsed !== 'object') {
       throw new Error('Parsed result is not a JSON object');
     }
     return parsed;
   } catch (error) {
-    throw new Error(`LLM JSON parse failed: ${error.message}\nRaw output: ${text}`);
+    try {
+      const repaired = jsonrepair(result) //Try to fix the problem
+      return JSON.parse(repaired);
+    } catch(e) {
+      throw new Error(`LLM JSON parse failed: ${error.message}\nRaw output: ${text}`);
+    }
+    
+    
   }
 }
 

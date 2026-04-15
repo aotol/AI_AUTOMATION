@@ -1,12 +1,11 @@
-const { stripHtml } = require('../skill-utils');
+const { findPreviousOutputByKey, stripHtml } = require('../skill-utils');
 
 module.exports = {
   stepName: 'extract_text_from_html',
   requiresAI: false,
-  payloadDefinition: {html: 'The html code.'},
+  payloadDefinition: {html: 'The html code provided by the task.'},
   description: 'Extract readable text from HTML content by stripping tags and scripts.',
   execute: async (context, services, stepDefinition) => {
-    const { findPreviousOutputByKey } = require('../skill-utils');
     let html;
     let htmlFromPayload = stepDefinition.payload && typeof stepDefinition.payload.html === 'string' && stepDefinition.payload?.html?.trim() != '' ? stepDefinition.payload.html : null;
     let htmlFromContext = findPreviousOutputByKey(context, "html");

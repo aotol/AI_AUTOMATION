@@ -1,3 +1,6 @@
+const { findPreviousOutputByKey } = require('../skill-utils');
+const { config } = require('../config');
+    const nodemailer = require('nodemailer');
 module.exports = {
   stepName: 'send_email',
   requiresAI: false,
@@ -8,10 +11,6 @@ module.exports = {
   description: 'Send email with task results to the specified recipient.',
   
   execute: async (context, services, stepDefinition) => {
-    const { findPreviousOutputByKey } = require('../skill-utils');
-    const { config } = require('../config');
-    const nodemailer = require('nodemailer');
-    
     const recipientAddress = stepDefinition.payload && stepDefinition.payload.address;
     if (!recipientAddress || typeof recipientAddress !== 'string') {
       throw new Error('send_email step requires payload.address');

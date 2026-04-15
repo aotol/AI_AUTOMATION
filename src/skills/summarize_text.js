@@ -1,10 +1,10 @@
-const { findPreviousOutputByKey } = require('../skill-utils');
+const { findPreviousOutputByKey, getLanguageFromText } = require('../skill-utils');
 
 module.exports = {
   stepName: 'summarize_text',
   requiresAI: true,
   payloadDefinition: {text: 'The text to summarize.'},
-  description: 'Summarize the text content clearly and concisely.',
+  description: 'Summarize the content clearly and concisely.',
   execute: async (context, services, stepDefinition) => {
     let sourceText;
     let sourceTextFromPayload = stepDefinition.payload && typeof stepDefinition.payload.text === 'string' && stepDefinition.payload?.text?.trim() != '' ? stepDefinition.payload.text : null;
@@ -28,11 +28,9 @@ module.exports = {
     if (!sourceText) {
       throw new Error('summarize_text step requires payload.text or previous step output.');
     }
-    let sourceLanguage = findPreviousOutputByKey(context, "languageName");
-    if (!sourceLanguage || sourceLanguage.trim() == '') {
-      sourceLanguage = null;
-    }
-    const prompt = `Summarize the following ${sourceLanguage ? `${sourceLanguage} ` : ''}text clearly and concisely. Return only the summary text.\n\nText:\n${sourceText}`;
+    let language = await getLanguageFromText(sourceText);
+    let languageName = language.languageName;
+    const prompt = `Summarize the following ${languageName ? `${languageName} ` : ''}text clearly and concisely${languageName ? ` in ${languageName}` : ''}. Return only the summary text.\n\nText:\n${sourceText}`;
     const summaryText = await services.llmProvider.generateText(prompt);
     return {
       text: summaryText
