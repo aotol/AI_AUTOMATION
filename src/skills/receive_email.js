@@ -3,6 +3,9 @@ const { findPreviousOutputByKey } = require('../skill-utils');
 const {
   simpleParser
 } = require('mailparser');
+const {
+  config
+} = require('../config');
 
 module.exports = {
   stepName: 'receive_email',
@@ -13,9 +16,7 @@ module.exports = {
   description: 'Retrieve the latest emails from the inbox.',
 
   execute: async (context, services, stepDefinition) => {
-    const {
-      config
-    } = require('../config');
+    
     let emailCount = stepDefinition.payload ? stepDefinition.payload.count : findPreviousOutputByKey(context, "count");
     if (!emailCount) {
       emailCount = 1;

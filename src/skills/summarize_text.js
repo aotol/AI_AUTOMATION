@@ -4,7 +4,7 @@ module.exports = {
   stepName: 'summarize_text',
   requiresAI: true,
   payloadDefinition: {text: 'The text to summarize.'},
-  description: 'Summarize the content clearly and concisely.',
+  description: 'Summarize the content for the given text.',
   execute: async (context, services, stepDefinition) => {
     let sourceText;
     let sourceTextFromPayload = stepDefinition.payload && typeof stepDefinition.payload.text === 'string' && stepDefinition.payload?.text?.trim() != '' ? stepDefinition.payload.text : null;

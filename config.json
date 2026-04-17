@@ -12,7 +12,7 @@
   "llm": {
     "provider": "ollama",
     "baseUrl": "http://127.0.0.1:11434",
-    "model": "gpt-oss:20b",
+    "model": "gemma4:e4b",
     "timeoutMs": 120000,
     "maxInputChars": 20000,
     "maxOutputTokens": 4000,
@@ -27,20 +27,23 @@
     "provider": "smtp",
     "smtp": {
       "name": "AI Automation Framework",
-      "host": "<smtp host>",
+      "host": "<STMP Server address>",
       "port": 465,
       "secure": true,
       "auth": {
-        "user": "<email user>",
-        "pass": "<email app passcode>"
+        "user": "<SMTP user name>",
+        "pass": "<SMTP App Passcode>"
       }
     },
     "imap": {
-      "user": "<email user>",
-      "password": "<email app passcode>",
-      "host": "<imap host>",
+      "user": "<IMAP user name>",
+      "password": "<IMAP App Passcode>",
+      "host": "<IMAP Server address>",
       "port": 993,
       "tls": true
     }
+  },
+  "search_web": {
+    "api_key": "Tavily web search API key"
   }
 }

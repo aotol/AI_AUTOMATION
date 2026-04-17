@@ -239,6 +239,7 @@ This keeps the system abstract and avoids hardcoding payload values for every in
 - **summarize_text**: Creates concise summaries
 - **receive_email**: Retrieves latest emails from IMAP inbox
 - **send_email**: Sends emails via SMTP
+- **search web**: Get Internet search result
 - **format_output**: Structures final output as JSON
 
 ## API Reference

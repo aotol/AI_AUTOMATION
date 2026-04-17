@@ -1,6 +1,6 @@
 const { findPreviousOutputByKey } = require('../skill-utils');
 const { config } = require('../config');
-    const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer');
 module.exports = {
   stepName: 'send_email',
   requiresAI: false,

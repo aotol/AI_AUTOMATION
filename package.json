@@ -1,18 +1,23 @@
 {
   "name": "lightweight-ai-automation-framework",
-  "version": "0.2.0",
-  "description": "Minimal program-controlled AI automation framework proof of concept.",
+  "version": "0.2.1",
+  "author": {
+    "name": "Zhan Zhang",
+    "url": "https://www.linkedin.com/in/zhanz"
+  },
+  "description": "A lightweight, program-controlled AI automation framework inspired by the Harness philosophy.",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js"
   },
   "dependencies": {
+    "@tavily/core": "^0.7.2",
+    "eld": "^2.0.3",
     "imap-simple": "^5.1.0",
+    "jsonrepair": "^3.13.3",
     "mailparser": "^3.9.8",
     "nodemailer": "^8.0.5",
-    "sqlite3": "^5.1.6",
-    "jsonrepair": "^3.13.3",
-    "eld": "^2.0.3"
+    "sqlite3": "^5.1.6"
   },
   "engines": {
     "node": ">=18"
