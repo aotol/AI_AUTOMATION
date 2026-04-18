@@ -63,9 +63,9 @@ Respond with ONLY a JSON array of skill names. No markdown, no explanation, no e
 Available skills:
 ${formatAllSkillsDescriptions(false)}
 
-Your job: Convert the task into an ordered sequence of atomic skill names that the program can execute.
+Your job: Convert the task into an ordered sequence of skill names from available skill list.
 CRITICAL RULES:
-- Do not invent new step names
+- Do not invent new skill names
 - Use ONLY the available skill names exactly as shown
 - Determine the correct order based on data flow (outputs from earlier steps feed into later steps)
 - Return ONLY a JSON array like: ["skill1", "skill2", "skill3"]
@@ -78,7 +78,48 @@ Task: ${task}
   return ensurePromptWithinLimit(prompt);
 }
 
+function buildAnalysisPrompt(task) {
+  const prompt = `You are a generic planner for a program-controlled workflow.
+Respond with ONLY a JSON array of required atomic steps names in sequence. No markdown, no explanation, no extra text before or after.
+
+For example:
+"Find the document abc from my laptop" can be described as ["open laptop", "open search box", "enter abc", "press search button", "read result", "report result"]
+
+Your job: Convert the task into an ordered sequence of atomic skill names that the program can execute.
+CRITICAL RULES:
+- Determine the correct order based on data flow (outputs from earlier steps feed into later steps)
+- Return ONLY a JSON array like: ["step1", "step2", "step3"]
+
+Task: ${task}
+`;
+  return ensurePromptWithinLimit(prompt);
+}
+
+function buildFindSkillPrompt(task) {
+  const prompt = `You are a generic planner for a program-controlled workflow.
+Respond with ONLY a skill name. No markdown, no explanation, no extra text before or after.
+
+Available skills:
+${formatAllSkillsDescriptions(false)}
+
+Your job: Find one skill that matchs the best of the task.
+CRITICAL RULES:
+- Do not invent new skill names
+- Use ONLY the available skill names exactly as shown
+- Only return 1 skill name
+- If no skill matchs the task, return ""
+
+Example for task: "send email" return "send_email"
+Example for non-existing-task: "does not exist" return ""
+
+Task: ${task}
+`;
+  return ensurePromptWithinLimit(prompt);
+}
+
 module.exports = {
   buildPlanPrompt,
-  buildFillSkillParameterPrompt
+  buildFillSkillParameterPrompt,
+  buildAnalysisPrompt,
+  buildFindSkillPrompt
 };

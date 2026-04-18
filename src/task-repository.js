@@ -1,18 +1,40 @@
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
-const { config } = require('./config');
-const { logDebug } = require('./logger');
+const {
+  config
+} = require('./config');
+const {
+  logDebug
+} = require('./logger');
 const path = require('path');
-const { promisify } = require('util');
+const {
+  promisify
+} = require('util');
 
 class TaskRepository {
   constructor() {
     const sqlitePath = path.resolve(process.cwd(), config.sqlite.path);
-    fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
+    fs.mkdirSync(path.dirname(sqlitePath), {
+      recursive: true
+    });
     this.db = new sqlite3.Database(sqlitePath);
-    this.runAsync = promisify(this.db.run.bind(this.db));
     this.getAsync = promisify(this.db.get.bind(this.db));
     this.allAsync = promisify(this.db.all.bind(this.db));
+  }
+  
+  runAsync(sql, params = []) {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function (error) {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve({
+          lastID: this.lastID,
+          changes: this.changes
+        });
+      });
+    });
   }
 
   // Task Status Constants
@@ -36,6 +58,12 @@ class TaskRepository {
     COMPLETED: 'completed',
     VALIDATION_FAILED: 'validation_failed',
     FAILED: 'failed'
+  };
+
+  static WORKFLOW_STATUS = {
+    ACTIVE: 'active',
+    INACTIVE: 'inactive',
+    REJECTED: 'rejected'
   };
 
   /**
@@ -131,6 +159,22 @@ class TaskRepository {
       event_detail_json TEXT,
       created_at TEXT NOT NULL
     )`);
+
+    await this.runAsync(`CREATE TABLE IF NOT EXISTS approved_workflow_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      raw_request TEXT NOT NULL,
+      normalized_request_template TEXT NOT NULL,
+      planned_skill_names_json TEXT NOT NULL,
+      source TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+
+    await this.runAsync(
+      `CREATE INDEX IF NOT EXISTS idx_approved_workflow_templates_template_status
+       ON approved_workflow_templates(normalized_request_template, status)`
+    );
   }
 
   async createTask(taskId, rawInput) {
@@ -185,7 +229,9 @@ class TaskRepository {
           if (error) {
             return reject(error);
           }
-          resolve({ id: this.lastID });
+          resolve({
+            id: this.lastID
+          });
         }
       );
     });
@@ -217,6 +263,213 @@ class TaskRepository {
       `INSERT INTO task_events (task_id, event_type, event_detail_json, created_at) VALUES (?, ?, ?, ?)`,
       [taskId, eventType, JSON.stringify(detail || {}), now]
     );
+  }
+
+  async findActiveWorkflowByTemplate(normalizedRequestTemplate) {
+    if (!normalizedRequestTemplate || typeof normalizedRequestTemplate !== 'string') {
+      return null;
+    }
+
+    const row = await this.getAsync(
+      `SELECT
+         id,
+         raw_request,
+         normalized_request_template,
+         planned_skill_names_json,
+         source,
+         status,
+         created_at,
+         updated_at
+       FROM approved_workflow_templates
+       WHERE normalized_request_template = ?
+         AND status = ?
+       ORDER BY id DESC
+       LIMIT 1`,
+      [normalizedRequestTemplate, TaskRepository.WORKFLOW_STATUS.ACTIVE]
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    let plannedSkillNames = [];
+    try {
+      plannedSkillNames = JSON.parse(row.planned_skill_names_json);
+    } catch (error) {
+      throw new Error(
+        `Failed to parse planned_skill_names_json for workflow id ${row.id}: ${error.message}`
+      );
+    }
+
+    return {
+      id: row.id,
+      rawRequest: row.raw_request,
+      normalizedRequestTemplate: row.normalized_request_template,
+      plannedSkillNames,
+      source: row.source,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  async createWorkflowTemplate(record) {
+    if (!record || typeof record !== 'object') {
+      throw new Error('createWorkflowTemplate requires a record object.');
+    }
+
+    if (!record.rawRequest || typeof record.rawRequest !== 'string') {
+      throw new Error('createWorkflowTemplate requires rawRequest.');
+    }
+
+    if (!record.normalizedRequestTemplate || typeof record.normalizedRequestTemplate !== 'string') {
+      throw new Error('createWorkflowTemplate requires normalizedRequestTemplate.');
+    }
+
+    if (!Array.isArray(record.plannedSkillNames) || record.plannedSkillNames.length === 0) {
+      throw new Error('createWorkflowTemplate requires non-empty plannedSkillNames.');
+    }
+
+    if (!record.source || typeof record.source !== 'string') {
+      throw new Error('createWorkflowTemplate requires source.');
+    }
+
+    const now = new Date().toISOString();
+    const plannedSkillNamesJson = JSON.stringify(record.plannedSkillNames);
+
+    const result = await this.runAsync(
+      `INSERT INTO approved_workflow_templates (
+         raw_request,
+         normalized_request_template,
+         planned_skill_names_json,
+         source,
+         status,
+         created_at,
+         updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        record.rawRequest,
+        record.normalizedRequestTemplate,
+        plannedSkillNamesJson,
+        record.source,
+        record.status || TaskRepository.WORKFLOW_STATUS.ACTIVE,
+        now,
+        now
+      ]
+    );
+
+    return result.lastID;
+  }
+
+  async updateWorkflowStatus(workflowId, status) {
+    const allowedStatuses = Object.values(TaskRepository.WORKFLOW_STATUS);
+
+    if (!allowedStatuses.includes(status)) {
+      throw new Error(`Invalid workflow status: ${status}`);
+    }
+
+    const now = new Date().toISOString();
+    const result = await this.runAsync(
+      `UPDATE approved_workflow_templates
+       SET status = ?, updated_at = ?
+       WHERE id = ?`,
+      [status, now, workflowId]
+    );
+
+    if (!result || result.changes === 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  async deleteWorkflow(workflowId) {
+    const result = await this.runAsync(
+      `DELETE FROM approved_workflow_templates
+       WHERE id = ?`,
+      [workflowId]
+    );
+
+    if (!result || result.changes === 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  async getWorkflowById(workflowId) {
+    const row = await this.getAsync(
+      `SELECT
+         id,
+         raw_request,
+         normalized_request_template,
+         planned_skill_names_json,
+         source,
+         status,
+         created_at,
+         updated_at
+       FROM approved_workflow_templates
+       WHERE id = ?`,
+      [workflowId]
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    let plannedSkillNames = [];
+    try {
+      plannedSkillNames = JSON.parse(row.planned_skill_names_json);
+    } catch (error) {
+      plannedSkillNames = [];
+    }
+
+    return {
+      id: row.id,
+      rawRequest: row.raw_request,
+      normalizedRequestTemplate: row.normalized_request_template,
+      plannedSkillNames,
+      source: row.source,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  async listWorkflows() {
+    const rows = await this.allAsync(
+      `SELECT
+         id,
+         raw_request,
+         normalized_request_template,
+         planned_skill_names_json,
+         source,
+         status,
+         created_at,
+         updated_at
+       FROM approved_workflow_templates
+       ORDER BY id DESC`
+    );
+
+    return rows.map(function (row) {
+      let plannedSkillNames = [];
+      try {
+        plannedSkillNames = JSON.parse(row.planned_skill_names_json);
+      } catch (error) {
+        plannedSkillNames = [];
+      }
+
+      return {
+        id: row.id,
+        rawRequest: row.raw_request,
+        normalizedRequestTemplate: row.normalized_request_template,
+        plannedSkillNames,
+        source: row.source,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    });
   }
 }
 
