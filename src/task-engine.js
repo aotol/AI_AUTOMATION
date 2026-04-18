@@ -531,23 +531,48 @@ class TaskEngine {
 
         let normalized = rawInput;
 
+        // Normalize line breaks and tabs first
+        normalized = normalized.replace(/[\r\n\t]+/g, ' ');
+
+        // email first, so email domain is not mistaken as URL
         normalized = normalized.replace(
             /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
             '<EMAIL>'
         );
 
+        // URL / domain / www / domain with optional path
         normalized = normalized.replace(
             /\b((https?:\/\/)?(www\.)?([a-z0-9-]+\.)+[a-z]{2,}([\/?#][^\s]*)?)\b/gi,
             '<URL>'
         );
 
+        // quoted string with double quotes
         normalized = normalized.replace(/"([^"\\]|\\.)*"/g, '"<STRING>"');
+
+        // quoted string with single quotes
         normalized = normalized.replace(/'([^'\\]|\\.)*'/g, '\'<STRING>\'');
 
+        // number after colon
         normalized = normalized.replace(/(:\s*)-?\d+(\.\d+)?\b/g, '$1<NUMBER>');
+
+        // number after equal sign
         normalized = normalized.replace(/(=\s*)-?\d+(\.\d+)?\b/g, '$1<NUMBER>');
+
+        // remaining standalone numbers
         normalized = normalized.replace(/\b-?\d+(\.\d+)?\b/g, '<NUMBER>');
 
+        // Normalize spaces around punctuation
+        normalized = normalized.replace(/\s*:\s*/g, ': ');
+        normalized = normalized.replace(/\s*,\s*/g, ', ');
+        normalized = normalized.replace(/\s*;\s*/g, '; ');
+        normalized = normalized.replace(/\s*\(\s*/g, '(');
+        normalized = normalized.replace(/\s*\)\s*/g, ')');
+        normalized = normalized.replace(/\s*\{\s*/g, '{');
+        normalized = normalized.replace(/\s*\}\s*/g, '}');
+        normalized = normalized.replace(/\s*\[\s*/g, '[');
+        normalized = normalized.replace(/\s*\]\s*/g, ']');
+
+        // Collapse spaces again after punctuation normalization
         normalized = normalized.replace(/\s+/g, ' ').trim();
 
         return normalized;
