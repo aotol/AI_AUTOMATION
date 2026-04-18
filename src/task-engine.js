@@ -253,7 +253,8 @@ class TaskEngine {
                     let filledPayloadParameters =
                         await this.services.llmProvider.generateJson(fillPayloadParametersPrompt);
 
-                    if (filledPayloadParameters && filledPayloadParameters[skillName]) {
+                    if (filledPayloadParameters && Object.keys(filledPayloadParameters) == 1 && filledPayloadParameters[skillName]) {
+                        //Sometimes the LLM may put he skill name as the top level JSON object
                         filledPayloadParameters = filledPayloadParameters[skillName];
                     }
 

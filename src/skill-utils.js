@@ -1,3 +1,4 @@
+const { logInfo, logError, logDebug } = require('./logger');
 /**
  * @deprecated
  */
@@ -70,7 +71,8 @@ function getLanguageNameFromLanguageCode(languageCode) {
   try {
     languageName = languageNames.of(languageCode);
   } catch (e) {
-
+    logError(`Error happned when get language from code: ${languageCode}\n${e}`);
+    languageName = languageCode;
   }
   return languageName;
 }
