@@ -160,9 +160,8 @@ class TaskRepository {
       created_at TEXT NOT NULL
     )`);
 
-    await this.runAsync(`CREATE TABLE IF NOT EXISTS approved_workflow_templates (
+    await this.runAsync(`CREATE TABLE IF NOT EXISTS workflow_templates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      raw_request TEXT NOT NULL,
       normalized_request_template TEXT NOT NULL,
       planned_skill_names_json TEXT NOT NULL,
       source TEXT NOT NULL,
@@ -172,8 +171,8 @@ class TaskRepository {
     )`);
 
     await this.runAsync(
-      `CREATE INDEX IF NOT EXISTS idx_approved_workflow_templates_template_status
-       ON approved_workflow_templates(normalized_request_template, status)`
+      `CREATE INDEX IF NOT EXISTS idx_workflow_templates_template_status
+       ON workflow_templates(normalized_request_template, status)`
     );
   }
 
@@ -273,14 +272,13 @@ class TaskRepository {
     const row = await this.getAsync(
       `SELECT
          id,
-         raw_request,
          normalized_request_template,
          planned_skill_names_json,
          source,
          status,
          created_at,
          updated_at
-       FROM approved_workflow_templates
+       FROM workflow_templates
        WHERE normalized_request_template = ?
          AND status = ?
        ORDER BY id DESC
@@ -303,7 +301,6 @@ class TaskRepository {
 
     return {
       id: row.id,
-      rawRequest: row.raw_request,
       normalizedRequestTemplate: row.normalized_request_template,
       plannedSkillNames,
       source: row.source,
@@ -316,10 +313,6 @@ class TaskRepository {
   async createWorkflowTemplate(record) {
     if (!record || typeof record !== 'object') {
       throw new Error('createWorkflowTemplate requires a record object.');
-    }
-
-    if (!record.rawRequest || typeof record.rawRequest !== 'string') {
-      throw new Error('createWorkflowTemplate requires rawRequest.');
     }
 
     if (!record.normalizedRequestTemplate || typeof record.normalizedRequestTemplate !== 'string') {
@@ -338,17 +331,15 @@ class TaskRepository {
     const plannedSkillNamesJson = JSON.stringify(record.plannedSkillNames);
 
     const result = await this.runAsync(
-      `INSERT INTO approved_workflow_templates (
-         raw_request,
+      `INSERT INTO workflow_templates (
          normalized_request_template,
          planned_skill_names_json,
          source,
          status,
          created_at,
          updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
       [
-        record.rawRequest,
         record.normalizedRequestTemplate,
         plannedSkillNamesJson,
         record.source,
@@ -370,7 +361,7 @@ class TaskRepository {
 
     const now = new Date().toISOString();
     const result = await this.runAsync(
-      `UPDATE approved_workflow_templates
+      `UPDATE workflow_templates
        SET status = ?, updated_at = ?
        WHERE id = ?`,
       [status, now, workflowId]
@@ -385,7 +376,7 @@ class TaskRepository {
 
   async deleteWorkflow(workflowId) {
     const result = await this.runAsync(
-      `DELETE FROM approved_workflow_templates
+      `DELETE FROM workflow_templates
        WHERE id = ?`,
       [workflowId]
     );
@@ -401,14 +392,13 @@ class TaskRepository {
     const row = await this.getAsync(
       `SELECT
          id,
-         raw_request,
          normalized_request_template,
          planned_skill_names_json,
          source,
          status,
          created_at,
          updated_at
-       FROM approved_workflow_templates
+       FROM workflow_templates
        WHERE id = ?`,
       [workflowId]
     );
@@ -426,7 +416,6 @@ class TaskRepository {
 
     return {
       id: row.id,
-      rawRequest: row.raw_request,
       normalizedRequestTemplate: row.normalized_request_template,
       plannedSkillNames,
       source: row.source,
@@ -440,14 +429,13 @@ class TaskRepository {
     const rows = await this.allAsync(
       `SELECT
          id,
-         raw_request,
          normalized_request_template,
          planned_skill_names_json,
          source,
          status,
          created_at,
          updated_at
-       FROM approved_workflow_templates
+       FROM workflow_templates
        ORDER BY id DESC`
     );
 
@@ -461,7 +449,6 @@ class TaskRepository {
 
       return {
         id: row.id,
-        rawRequest: row.raw_request,
         normalizedRequestTemplate: row.normalized_request_template,
         plannedSkillNames,
         source: row.source,

@@ -214,7 +214,6 @@ class TaskEngine {
             logger.logInfo(`Plan validated successfully: [${plannedSkillNames}]`);
             if (!workflowId) {
                 workflowId = await taskRepository.createWorkflowTemplate({
-                    rawRequest: rawInput,
                     normalizedRequestTemplate,
                     plannedSkillNames,
                     source: workflowSource || 'restricted_planning',
