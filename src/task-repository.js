@@ -343,7 +343,7 @@ class TaskRepository {
         record.normalizedRequestTemplate,
         plannedSkillNamesJson,
         record.source,
-        record.status || TaskRepository.WORKFLOW_STATUS.ACTIVE,
+        record.status || TaskRepository.WORKFLOW_STATUS.INACTIVE,
         now,
         now
       ]

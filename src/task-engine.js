@@ -213,11 +213,12 @@ class TaskEngine {
             await taskRepository.addEvent(taskId, 'planning_validated', plannedSkillNames);
             logger.logInfo(`Plan validated successfully: [${plannedSkillNames}]`);
             if (!workflowId) {
+                let status = config.workflow.autoActivate ? taskRepository.constructor.WORKFLOW_STATUS.ACTIVE : taskRepository.constructor.WORKFLOW_STATUS.INACTIVE;
                 workflowId = await taskRepository.createWorkflowTemplate({
                     normalizedRequestTemplate,
                     plannedSkillNames,
                     source: workflowSource || 'restricted_planning',
-                    status: taskRepository.constructor.WORKFLOW_STATUS.ACTIVE
+                    status
                 });
 
                 await taskRepository.addEvent(taskId, 'workflow_created', {

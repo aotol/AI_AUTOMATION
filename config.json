@@ -6,6 +6,9 @@
   "input": {
     "maxLength": 640000
   },
+  "workflow": {
+    "autoActivate": true
+  },
   "output": {
     "maxLength": 640000
   },
@@ -27,23 +30,23 @@
     "provider": "smtp",
     "smtp": {
       "name": "AI Automation Framework",
-      "host": "<STMP Server address>",
+      "host": "<SMTP HOST>",
       "port": 465,
       "secure": true,
       "auth": {
-        "user": "<SMTP user name>",
-        "pass": "<SMTP App Passcode>"
+        "user": "<USER>",
+        "pass": "<PASS>"
       }
     },
     "imap": {
-      "user": "<IMAP user name>",
-      "password": "<IMAP App Passcode>",
-      "host": "<IMAP Server address>",
+      "user": "<USER>",
+      "password": "<PASS>",
+      "host": "<IMAP HOST>",
       "port": 993,
       "tls": true
     }
   },
   "search_web": {
-    "api_key": "Tavily web search API key"
+    "api_key": "<SEARCH API KEY>"
   }
 }
