@@ -3,7 +3,7 @@ module.exports = {
   stepName: 'translate_text',
   requiresAI: true,
   payloadDefinition: {text: 'The text provided by the task for translation.', targetLanguage: 'The target language translate into.'},
-  description: 'Translate the text into target language. ',
+  description: 'Translate the text into target language. e.g.: If the text is "Translate Hello how are you into Chinese", then text is "Hello how are you" and targetLanguage is "Chinese".',
   execute: async (context, services, stepDefinition) => {
     let sourceText;
     let sourceTextFromPayload = stepDefinition.payload && typeof stepDefinition.payload.text === 'string' && stepDefinition.payload?.text?.trim() != '' ? stepDefinition.payload.text : null;

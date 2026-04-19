@@ -16,7 +16,7 @@ module.exports = {
     query: 'The search query text.',
     max_result_count: 'The max search result count specified by the task.'
   },
-  description: 'Get internet search result.',
+  description: 'Get internet search result. e.g.: "Search the most popular songs in the world and get the first 10 result", the query is "the most popular songs" and max_result_count is "10".',
   execute: async (context, services, stepDefinition) => {
     const query = stepDefinition.payload && typeof stepDefinition.payload.query === 'string' ?
     stepDefinition.payload.query : findPreviousOutputByKey(context, "query");
