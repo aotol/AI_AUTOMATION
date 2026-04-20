@@ -6,10 +6,62 @@ const promptBuilder = require('./prompt-builder');
 const validators = require('./validators');
 const skills = require('./skills-loader');
 const sc = require('string-comparison').default;
+const nspell = require('nspell');
+
+const spellchecker = (function () {
+    let spell = null;
+    let readyResolve;
+    const ready = new Promise((resolve) => {
+        readyResolve = resolve;
+    });
+
+    // Load dictionary asynchronously because dictionary-en is an ESM module
+    import('dictionary-en')
+        .then((module) => {
+            const dictionary = module.default || module;
+
+            if (typeof dictionary === 'function') {
+                dictionary((err, dict) => {
+                    if (!err) {
+                        spell = nspell(dict);
+                    }
+                    readyResolve();
+                });
+            } else if (
+                dictionary &&
+                typeof dictionary.aff !== 'undefined' &&
+                typeof dictionary.dic !== 'undefined'
+            ) {
+                spell = nspell(dictionary);
+                readyResolve();
+            } else {
+                console.error('dictionary-en returned an unexpected export shape:', dictionary);
+                readyResolve();
+            }
+        })
+        .catch((error) => {
+            console.error('Failed to load dictionary-en:', error);
+            readyResolve();
+        });
+
+    return {
+        ready,
+        isReady: () => !!spell,
+        check: (word) => spell ? spell.correct(word) : true,
+        suggest: (word) => spell ? spell.suggest(word) : []
+    };
+})();
 
 class TaskEngine {
     constructor(services) {
         this.services = services;
+    }
+
+    async ensureSpellcheckerReady() {
+        if (spellchecker.isReady()) {
+            return;
+        }
+        await spellchecker.ready;
     }
 
     /**
@@ -149,6 +201,7 @@ class TaskEngine {
             await taskRepository.addEvent(taskId, 'planning_requested');
             logger.logInfo('Starting planning phase');
 
+            await this.ensureSpellcheckerReady();
             const normalizedRequestTemplate = this.normalizeRequestTemplate(rawInput);
             let plannedSkillNames = [];
             let workflowId = null;
@@ -531,6 +584,29 @@ class TaskEngine {
 
         let normalized = rawInput;
 
+        // Only run if the dictionary has finished loading
+        if (spellchecker.isReady()) {
+            // Split by whitespace to preserve the original structure
+            const parts = normalized.split(/(\s+)/);
+
+            const correctedParts = parts.map(part => {
+                if (!part.trim()) return part; // Skip whitespace
+
+                // Remove punctuation just for the check (e.g., "word." -> "word")
+                const cleanWord = part.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '');
+                const shouldSpellcheck =/^[a-zA-Z]+$/.test(cleanWord) && cleanWord.length >= 3 && cleanWord.length <= 20;
+
+                if (shouldSpellcheck && cleanWord.length > 0 && !spellchecker.check(cleanWord)) {
+                    const suggestions = spellchecker.suggest(cleanWord);
+                    if (Array.isArray(suggestions) && suggestions.length > 0) {
+                        return part.replace(cleanWord, suggestions[0]);
+                    }
+                }
+                return part;
+            });
+
+            normalized = correctedParts.join('');
+        }
         // Normalize line breaks and tabs first
         normalized = normalized.replace(/[\r\n\t]+/g, ' ');
 
@@ -575,7 +651,7 @@ class TaskEngine {
         // Collapse spaces again after punctuation normalization
         normalized = normalized.replace(/\s+/g, ' ').trim();
 
-        return normalized;
+        return normalized.toLowerCase().trim();
     }
 }
 

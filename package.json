@@ -1,6 +1,6 @@
 {
   "name": "lightweight-ai-automation-framework",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "author": {
     "name": "Zhan Zhang",
     "url": "https://www.linkedin.com/in/zhanz"
@@ -18,7 +18,9 @@
     "mailparser": "^3.9.8",
     "nodemailer": "^8.0.5",
     "sqlite3": "^5.1.6",
-    "string-comparison": "^1.3.0"
+    "string-comparison": "^1.3.0",
+    "nspell":"^2.1.5",
+    "dictionary-en":"^4.0.0"
   },
   "engines": {
     "node": ">=18"

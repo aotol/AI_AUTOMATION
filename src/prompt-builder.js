@@ -26,7 +26,7 @@ function formatSkillDescription(skill, includeParameters) {
   if (includeParameters) {
     payloadDefinition = skill.payloadDefinition ? Object.entries(skill.payloadDefinition).map(
       function ([key, value]) {
-        return key + ": " + value;
+        return "'" + key + "': " + value;
       }).join(" "): "";
     }
     return `- ${name}: ${desc}${includeParameters ? ` Required parameters: [${payloadDefinition}]` : ''}`;
@@ -39,19 +39,20 @@ Respond with JSON only and no markdown.
 You have the following available skill:
 ${formatSkillDescription(skill, true)}
 
-Capture required parameter from the following task then return as a JSON object.
-Task: ${rawInput}
-
 Rules:
+- Capture required parameter from the task then return as a JSON object.
 - If you extracted a value for a required parameter, put it into JSON's object's root level.
 - The output JSON format is: {<skill parameter name>: <skill parameter value>}
 - If the task does not contains the value for required parameter, skip this parameter.
 - Do not add parameter that is not specified in the skill.
 - Only return JSON object, no other text.
 
+Task:
+${rawInput}
+
 Example:
-If you extracted value for required parameters "param_1", "param_2" for skill "example_skill", your output JOSN should be:
-{"param_1": <param_1_value>, "param_2": <param_2_value>}
+If you extracted value for required parameters 'param_1' and 'pparam_2' for skill 'example_skill', your output JOSN should be:
+{'param_1': <param_1_value>, 'param_2': <param_2_value>}
 `;
   return ensurePromptWithinLimit(prompt);
 }
