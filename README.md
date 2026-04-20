@@ -203,6 +203,9 @@ Edit `config.json`:
   "output": {
     "maxLength": 50000
   },
+  "workflow": {
+    "autoActivate": true
+  },
   "email": {
     "provider": "smtp",
     "smtp": {
