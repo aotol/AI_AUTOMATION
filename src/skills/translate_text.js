@@ -2,8 +2,8 @@ const { findPreviousOutputByKey, getLanguageFromText, getLanguageNameFromLanguag
 module.exports = {
   stepName: 'translate_text',
   requiresAI: true,
-  payloadDefinition: {text: 'The text provided by the task for translation.', targetLanguage: 'The language required to be translated into.'},
-  description: 'Translate the text into the target language.',
+  payloadDefinition: {text: 'The actual text needs translation. Skip this field if the actual text is not available.', targetLanguage: 'The language required to be translated into.'},
+  description: 'Translate required text into the target language.',
   execute: async (context, services, stepDefinition) => {
     let sourceText;
     let sourceTextFromPayload = stepDefinition.payload && typeof stepDefinition.payload.text === 'string' && stepDefinition.payload?.text?.trim() != '' ? stepDefinition.payload.text : null;

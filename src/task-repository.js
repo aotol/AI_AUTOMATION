@@ -165,7 +165,7 @@ class TaskRepository {
     await this.runAsync(`CREATE TABLE IF NOT EXISTS workflow_templates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       normalized_request_template TEXT NOT NULL,
-      planned_skill_names_json TEXT NOT NULL,
+      planned_skills TEXT NOT NULL,
       source TEXT NOT NULL,
       status TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -279,7 +279,7 @@ class TaskRepository {
     SELECT
       id,
       normalized_request_template,
-      planned_skill_names_json,
+      planned_skills,
       source,
       status,
       created_at,
@@ -306,19 +306,19 @@ class TaskRepository {
       return null;
     }
 
-    let plannedSkillNames = [];
+    let plannedSkills = [];
     try {
-      plannedSkillNames = JSON.parse(row.planned_skill_names_json);
+      plannedSkills = JSON.parse(row.planned_skills);
     } catch (error) {
       throw new Error(
-        `Failed to parse planned_skill_names_json for workflow id ${row.id}: ${error.message}`
+        `Failed to parse planned_skills for workflow id ${row.id}: ${error.message}`
       );
     }
 
     return {
       id: row.id,
       normalizedRequestTemplate: row.normalized_request_template,
-      plannedSkillNames,
+      plannedSkills: plannedSkills,
       source: row.source,
       status: row.status,
       createdAt: row.created_at,
@@ -335,8 +335,8 @@ class TaskRepository {
       throw new Error('createWorkflowTemplate requires normalizedRequestTemplate.');
     }
 
-    if (!Array.isArray(record.plannedSkillNames) || record.plannedSkillNames.length === 0) {
-      throw new Error('createWorkflowTemplate requires non-empty plannedSkillNames.');
+    if (typeof record.plannedSkills !== 'object' || Object.keys(record.plannedSkills).length === 0) {
+      throw new Error('createWorkflowTemplate requires non-empty plannedSkills.');
     }
 
     if (!record.source || typeof record.source !== 'string') {
@@ -344,12 +344,12 @@ class TaskRepository {
     }
 
     const now = new Date().toISOString();
-    const plannedSkillNamesJson = JSON.stringify(record.plannedSkillNames);
+    const plannedSkills = JSON.stringify(record.plannedSkills);
 
     const result = await this.runAsync(
       `INSERT INTO workflow_templates (
          normalized_request_template,
-         planned_skill_names_json,
+         planned_skills,
          source,
          status,
          created_at,
@@ -357,7 +357,7 @@ class TaskRepository {
        ) VALUES (?, ?, ?, ?, ?, ?)`,
       [
         record.normalizedRequestTemplate,
-        plannedSkillNamesJson,
+        plannedSkills,
         record.source,
         record.status || TaskRepository.WORKFLOW_STATUS.INACTIVE,
         now,
@@ -409,7 +409,7 @@ class TaskRepository {
       `SELECT
          id,
          normalized_request_template,
-         planned_skill_names_json,
+         planned_skills,
          source,
          status,
          created_at,
@@ -423,17 +423,17 @@ class TaskRepository {
       return null;
     }
 
-    let plannedSkillNames = [];
+    let plannedSkills = [];
     try {
-      plannedSkillNames = JSON.parse(row.planned_skill_names_json);
+      plannedSkills = JSON.parse(row.planned_skills);
     } catch (error) {
-      plannedSkillNames = [];
+      plannedSkills = [];
     }
 
     return {
       id: row.id,
       normalizedRequestTemplate: row.normalized_request_template,
-      plannedSkillNames,
+      plannedSkills: plannedSkills,
       source: row.source,
       status: row.status,
       createdAt: row.created_at,
@@ -446,7 +446,7 @@ class TaskRepository {
       `SELECT
          id,
          normalized_request_template,
-         planned_skill_names_json,
+         planned_skills,
          source,
          status,
          created_at,
@@ -456,17 +456,17 @@ class TaskRepository {
     );
 
     return rows.map(function (row) {
-      let plannedSkillNames = [];
+      let plannedSkills = [];
       try {
-        plannedSkillNames = JSON.parse(row.planned_skill_names_json);
+        plannedSkills = JSON.parse(row.planned_skills);
       } catch (error) {
-        plannedSkillNames = [];
+        plannedSkills = [];
       }
 
       return {
         id: row.id,
         normalizedRequestTemplate: row.normalized_request_template,
-        plannedSkillNames,
+        plannedSkills: plannedSkills,
         source: row.source,
         status: row.status,
         createdAt: row.created_at,

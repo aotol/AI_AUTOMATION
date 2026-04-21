@@ -8,7 +8,10 @@
   },
   "workflow": {
     "autoActivate": false,
-    "autoInactivate": true
+    "autoInactivate": true,
+    "fillParameter": {
+      "maxFillParameterRetryCount": 3
+    }
   },
   "output": {
     "maxLength": 640000

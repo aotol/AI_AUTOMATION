@@ -22,6 +22,32 @@ function validatePlannedSkillNames(skillNames) {
   return { valid: errors.length === 0, errors };
 }
 
+function validatePlannedSkills(plannedSkills) {
+  const errors = [];
+
+  if (typeof plannedSkills !== 'object') {
+    errors.push('Planned skill object must be a JSON object.');
+    return { valid: false, errors };
+  }
+  const plannedSkillNames = Object.keys(plannedSkills);
+  if (!Array.isArray(plannedSkillNames) || plannedSkillNames.length === 0) {
+    errors.push('AI_AUTOMATION does not have enough skill to carry out this task.');
+    return { valid: false, errors };
+  }
+
+  for (const plannedSkillName of plannedSkillNames) {
+    if (typeof plannedSkills[plannedSkillName] !== 'object') {
+      errors.push('Each planned skill must be a JSON object.');
+      continue;
+    }
+    if (!skills.hasStep(plannedSkillName)) {
+      errors.push(`Skill '${plannedSkillName}' is not supported by the implementation registry.`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 function validateStepBuilding(steps) {
   const errors = [];
 
@@ -61,6 +87,7 @@ function validateStepResult(result) {
 
 module.exports = {
   validatePlannedSkillNames,
+  validatePlannedSkills,
   validateStepBuilding,
   validateStepResult
 };

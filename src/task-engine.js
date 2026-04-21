@@ -5,7 +5,6 @@ const {
 const promptBuilder = require('./prompt-builder');
 const validators = require('./validators');
 const skills = require('./skills-loader');
-const sc = require('string-comparison').default;
 const nspell = require('nspell');
 
 const spellchecker = (function () {
@@ -83,101 +82,41 @@ class TaskEngine {
         return plannedSkillNames;
     }
 
-    /**
-     * Let LLM to freely break the task into atomic steps
-     * Pro: Less likely to miss required steps
-     * Con: May return unpredictable steps names, hard to map to avaiallbe skills
-     * @param {*} rawInput 
-     * @returns 
-     * @deprecated
-     */
-    async unrestrictedPlanningSolution(rawInput) {
-        const analysisPrompt = promptBuilder.buildAnalysisPrompt(rawInput);
-        const atomicSteps = await this.services.llmProvider.generateJson(analysisPrompt);
-        let plannedSkillNames = [];
-        if (!atomicSteps || !Array.isArray(atomicSteps) || atomicSteps.length === 0) {} else {
-            plannedSkillNames = await this.mapAtomicStepsToSkills(atomicSteps);
+    async fillParameters(rawInput, registeredSkill) {
+        const fillPayloadParametersPrompt = promptBuilder.buildFillSkillParameterPrompt(rawInput, registeredSkill);
+
+        let filledPayloadParameters = await this.services.llmProvider.generateJson(fillPayloadParametersPrompt);
+
+        if (
+            filledPayloadParameters &&
+            typeof filledPayloadParameters === 'object' &&
+            !Array.isArray(filledPayloadParameters) &&
+            Object.keys(filledPayloadParameters).length === 1 &&
+            filledPayloadParameters[registeredSkill.stepName]
+        ) {
+            filledPayloadParameters = filledPayloadParameters[registeredSkill.stepName];
         }
-        return plannedSkillNames;
+
+        return filledPayloadParameters;
     }
 
-    async mapAtomicStepsToSkills(atomicSteps) {
-        const {
-            logger,
-            llmProvider
-        } = this.services;
-
-        const plannedSkillNames = [];
-        const skillEntries = Object.entries(skills.registry);
-        const skillDetails = [];
-
-        for (const [skillName, skillDefinition] of skillEntries) {
-            const skillDetail = `${skillName}: ${skillDefinition.description}`;
-            skillDetails.push(skillDetail);
+    hasAllExpectedParameters(filledPayloadParameters, expectedParameters) {
+        if (
+            !filledPayloadParameters ||
+            typeof filledPayloadParameters !== 'object' ||
+            Array.isArray(filledPayloadParameters)
+        ) {
+            return false;
         }
 
-        for (const atomicStep of atomicSteps) {
-            const algorithm = sc.diceCoefficient;
-            const results = algorithm.sortMatch(atomicStep, skillDetails);
-
-            let bestMatch = null;
-            let foundSkill = null;
-
-            if (Array.isArray(results) && results.length > 0) {
-                bestMatch = results[results.length - 1];
-            }
-
-            if (
-                bestMatch &&
-                bestMatch.member &&
-                bestMatch.member.length > 0 &&
-                bestMatch.rating > 0.3
-            ) {
-                const separatorIndex = bestMatch.member.indexOf(':');
-                if (separatorIndex > -1) {
-                    foundSkill = bestMatch.member.substring(0, separatorIndex).trim();
-                } else {
-                    foundSkill = bestMatch.member.trim();
-                }
-            } else {
-                logger.logDebug(
-                    `string-comparison cannot find matched skill for atomicStep: ${atomicStep}. Pass down to LLM processing.`
-                );
-
-                const findSkillPrompt = promptBuilder.buildFindSkillPrompt(atomicStep);
-                let llmFoundSkill = await llmProvider.generateText(findSkillPrompt);
-
-                if (llmFoundSkill) {
-                    if (llmFoundSkill.indexOf(':') > -1) {
-                        llmFoundSkill = llmFoundSkill.substring(0, llmFoundSkill.indexOf(':'));
-                    }
-
-                    llmFoundSkill = llmFoundSkill.trim();
-
-                    if (llmFoundSkill === '""' || llmFoundSkill.length === 0) {
-                        llmFoundSkill = null;
-                    }
-                }
-
-                foundSkill = llmFoundSkill;
-            }
-
-            if (foundSkill) {
-                const lastPlannedSkillName = plannedSkillNames[plannedSkillNames.length - 1];
-                if (lastPlannedSkillName !== foundSkill) {
-                    plannedSkillNames.push(foundSkill);
-                    logger.logDebug(
-                        `mapAtomicStepsToSkills found matched skill: ${foundSkill} for atomicStep: ${atomicStep}`
-                    );
-                }
-            } else {
-                logger.logDebug(
-                    `mapAtomicStepsToSkills cannot find matched skill for atomicStep: ${atomicStep}`
-                );
+        for (let i = 0; i < expectedParameters.length; i++) {
+            const key = expectedParameters[i];
+            if (!Object.prototype.hasOwnProperty.call(filledPayloadParameters, key)) {
+                return false;
             }
         }
 
-        return plannedSkillNames;
+        return true;
     }
 
     async runTask(rawInput) {
@@ -203,22 +142,22 @@ class TaskEngine {
 
             await this.ensureSpellcheckerReady();
             const normalizedRequestTemplate = this.normalizeRequestTemplate(rawInput);
-            let plannedSkillNames = [];
+            let plannedSkills = {};
             let workflowId = null;
             let workflowSource = null;
 
             const existingWorkflow = await taskRepository.findWorkflowByTemplate(normalizedRequestTemplate);
 
-            if (existingWorkflow && Array.isArray(existingWorkflow.plannedSkillNames) && existingWorkflow.status != taskRepository.constructor.WORKFLOW_STATUS.REJECTED) {
+            if (existingWorkflow && existingWorkflow.status != taskRepository.constructor.WORKFLOW_STATUS.REJECTED) {
                 if (existingWorkflow.status == taskRepository.constructor.WORKFLOW_STATUS.ACTIVE) {
-                    plannedSkillNames = existingWorkflow.plannedSkillNames;
+                    plannedSkills = existingWorkflow.plannedSkills;
                     workflowId = existingWorkflow.id;
                     workflowSource = 'workflow_cache';
 
                     await taskRepository.addEvent(taskId, 'planning_reused_workflow', {
                         workflowId,
                         normalizedRequestTemplate,
-                        plannedSkillNames
+                        plannedSkills
                     });
 
                     logger.logInfo(
@@ -226,12 +165,11 @@ class TaskEngine {
                     );
                 } else if (existingWorkflow.status == taskRepository.constructor.WORKFLOW_STATUS.INACTIVE) {
                     logger.logInfo(
-                        `Unapproved existing workflow template found:
+                        `An unapproved existing workflow template was found:
 Workflow id: ${existingWorkflow.id}
 Pattern: ${existingWorkflow.normalizedRequestTemplate}
-Status: ${existingWorkflow.status}
-Workflow skill sequence: [${existingWorkflow.plannedSkillNames}]
-Please approve or reject this workflow template and try again.
+Workflow:\n${JSON.stringify(existingWorkflow.plannedSkills, null, 2)}
+Please approve or reject this workflow template then try again.
 To approve, run: 'node app.js admin activate-workflow ${existingWorkflow.id}'
 To rejet, run: 'node app.js admin reject-workflow ${existingWorkflow.id}'
 To delete, run: 'node app.js admin delete-workflow ${existingWorkflow.id}'
@@ -253,29 +191,53 @@ Workflow template will be set to inactive upon failure. To turn it off, set conf
                     };
                 }
             } else {
-                plannedSkillNames = await this.restrictedPlanningSolution(rawInput);
+                //Plan a new workflow
+                let proposedPlannedSkillNames = await this.restrictedPlanningSolution(rawInput);
+                const plannedSkillNamesValidation = validators.validatePlannedSkillNames(proposedPlannedSkillNames);
+                if (!plannedSkillNamesValidation.valid) {
+                    const error = plannedSkillNamesValidation.errors.join(' | ');
+                    await taskRepository.saveTaskPlan(taskId, proposedPlannedSkillNames);
+                    await taskRepository.updateTaskStatus(
+                        taskId,
+                        taskRepository.constructor.TASK_STATUS.PLAN_FAILED
+                    );
+                    await taskRepository.addEvent(taskId, 'planning_failed', {
+                        errors: plannedSkillNamesValidation.errors
+                    });
+                    await taskRepository.saveTaskError(taskId, error);
+                    logger.logError(`Plan skill names validation failed: ${error}`);
+
+                    return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.PLAN_FAILED, error, workflowId});
+                }
                 workflowSource = 'restricted_planning';
 
                 await taskRepository.addEvent(taskId, 'planning_generated_by_llm', {
                     normalizedRequestTemplate,
-                    plannedSkillNames
+                    plannedSkillNames: proposedPlannedSkillNames
                 });
-
+                //Convert [skill 1, skill 2, skill 3] formate into:
+                //{
+                //  skill 1: ["parameter 1 name can be extracted from the input"],
+                //  skill 2: ["parameter 1 name can be extracted from the input", "parameter 2 name can be extracted from the input", ...]
+                //}
+                for (const proposedPlannedSkillName of proposedPlannedSkillNames) {
+                    plannedSkills[proposedPlannedSkillName] = []
+                }
                 logger.logInfo(
-                    `Generated plan by restrictedPlanningSolution: [${plannedSkillNames}]`
+                    `Generated plan by restrictedPlanningSolution: ${JSON.stringify(plannedSkills)}`
                 );
             }
 
-            const plannedSkillNamesValidation = validators.validatePlannedSkillNames(plannedSkillNames);
-            if (!plannedSkillNamesValidation.valid) {
-                const error = plannedSkillNamesValidation.errors.join(' | ');
-                await taskRepository.saveTaskPlan(taskId, plannedSkillNames);
+            const plannedSkillValidation = validators.validatePlannedSkills(plannedSkills);
+            if (!plannedSkillValidation.valid) {
+                const error = plannedSkillValidation.errors.join(' | ');
+                await taskRepository.saveTaskPlan(taskId, plannedSkills);
                 await taskRepository.updateTaskStatus(
                     taskId,
                     taskRepository.constructor.TASK_STATUS.PLAN_FAILED
                 );
                 await taskRepository.addEvent(taskId, 'planning_failed', {
-                    errors: plannedSkillNamesValidation.errors
+                    errors: plannedSkillValidation.errors
                 });
                 await taskRepository.saveTaskError(taskId, error);
                 logger.logError(`Plan validation failed: ${error}`);
@@ -283,30 +245,13 @@ Workflow template will be set to inactive upon failure. To turn it off, set conf
                 return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.PLAN_FAILED, error, workflowId});
             }
 
-            await taskRepository.saveTaskPlan(taskId, plannedSkillNames);
+            await taskRepository.saveTaskPlan(taskId, plannedSkills);
             await taskRepository.updateTaskStatus(
                 taskId,
                 taskRepository.constructor.TASK_STATUS.PLAN_VALIDATED
             );
-            await taskRepository.addEvent(taskId, 'planning_validated', plannedSkillNames);
-            logger.logInfo(`Plan validated successfully: [${plannedSkillNames}]`);
-            if (!workflowId) {
-                let status = config.workflow.autoActivate ? taskRepository.constructor.WORKFLOW_STATUS.ACTIVE : taskRepository.constructor.WORKFLOW_STATUS.INACTIVE;
-                workflowId = await taskRepository.createWorkflowTemplate({
-                    normalizedRequestTemplate,
-                    plannedSkillNames,
-                    source: workflowSource || 'restricted_planning',
-                    status
-                });
-
-                await taskRepository.addEvent(taskId, 'workflow_created', {
-                    workflowId,
-                    normalizedRequestTemplate,
-                    plannedSkillNames
-                });
-
-                logger.logInfo(`Workflow created with id ${workflowId}`);
-            }
+            await taskRepository.addEvent(taskId, 'planning_validated', plannedSkills);
+            logger.logInfo(`Plan validated successfully: ${JSON.stringify(plannedSkills)}`);
 
             await taskRepository.updateTaskStatus(
                 taskId,
@@ -316,50 +261,97 @@ Workflow template will be set to inactive upon failure. To turn it off, set conf
             logger.logInfo('Starting step building phase');
 
             const steps = [];
+            let newPlannedSkills = {};
+            const creatingNewWorkflow = !workflowId;
+            const maxFillParameterRetryCount = config.workflow.fillParameter.maxFillParameterRetryCount;
+            let savedPlannedSkillEntries = Object.entries(plannedSkills);
+            for (let index = 0; index < savedPlannedSkillEntries.length; index++) {
+                const savedPlannedSkillEntry = savedPlannedSkillEntries[index];
+                const savedPlannedSkillname = savedPlannedSkillEntry[0];
 
-            for (let index = 0; index < plannedSkillNames.length; index++) {
-                const skillName = plannedSkillNames[index];
-                logger.logInfo(`Building step ${index}.${skillName}...`);
+                logger.logInfo(`Building step ${index}.${savedPlannedSkillname}...`);
 
-                const skill = skills.getStep(skillName);
+                const registeredSkill = skills.getStep(savedPlannedSkillname);
                 let payload = {};
 
-                if (skill && skill.payloadDefinition && Object.keys(skill.payloadDefinition).length > 0) {
-                    const fillPayloadParametersPrompt =
-                        promptBuilder.buildFillSkillParameterPrompt(rawInput, skill);
+                if (
+                    registeredSkill &&
+                    registeredSkill.payloadDefinition &&
+                    Object.keys(registeredSkill.payloadDefinition).length > 0
+                ) {
+                    const expectedParameters = Array.isArray(plannedSkills[savedPlannedSkillname])
+                        ? plannedSkills[savedPlannedSkillname]
+                        : [];
 
-                    let filledPayloadParameters =
-                        await this.services.llmProvider.generateJson(fillPayloadParametersPrompt);
+                    let filledPayloadParameters = null;
+                    let attemptCount = 0;
 
-                    if (filledPayloadParameters && Object.keys(filledPayloadParameters) == 1 && filledPayloadParameters[skillName]) {
-                        //Sometimes the LLM may put the skill name as the top level JSON object
-                        filledPayloadParameters = filledPayloadParameters[skillName];
+                    do {
+                        attemptCount++;
+                        filledPayloadParameters = await this.fillParameters(rawInput, registeredSkill);
+
+                        logger.logDebug(
+                            `Filled payload ${creatingNewWorkflow ? "" : `(attempt ${attemptCount})`} for ${savedPlannedSkillname}: ${JSON.stringify(filledPayloadParameters, null, 2)}`
+                        );
+
+                        if (this.hasAllExpectedParameters(filledPayloadParameters, expectedParameters)) {
+                            break;
+                        }
+
+                        logger.logDebug(
+                            `Skill ${savedPlannedSkillname} failed to extract all expected parameters ${JSON.stringify(expectedParameters)}. Retry ${attemptCount}/${maxFillParameterRetryCount}.`
+                        );
+                    } while (attemptCount < maxFillParameterRetryCount);
+
+                    if (creatingNewWorkflow && !newPlannedSkills[savedPlannedSkillname]) {
+                        newPlannedSkills[savedPlannedSkillname] = [];
                     }
 
-                    logger.logDebug(`Filled payload: ${JSON.stringify(filledPayloadParameters)}`);
+                    if (
+                        filledPayloadParameters &&
+                        typeof filledPayloadParameters === 'object' &&
+                        !Array.isArray(filledPayloadParameters)
+                    ) {
+                        const parameterKeys = Object.keys(registeredSkill.payloadDefinition);
 
-                    Object.keys(skill.payloadDefinition).forEach((key) => {
-                        try {
-                            if (
-                                filledPayloadParameters &&
-                                Object.prototype.hasOwnProperty.call(filledPayloadParameters, key)
-                            ) {
-                                payload[key] = filledPayloadParameters[key];
-                            } else {
-                                logger.logDebug(
-                                    `Missing key: ${key} when build execution plan ${index}.${skillName}. Need to provide the value during execution.`
-                                );
+                        for (let i = 0; i < parameterKeys.length; i++) {
+                            const key = parameterKeys[i];
+
+                            try {
+                                if (Object.prototype.hasOwnProperty.call(filledPayloadParameters, key)) {
+                                    payload[key] = filledPayloadParameters[key];
+
+                                    if (creatingNewWorkflow) {
+                                        if (!newPlannedSkills[savedPlannedSkillname].includes(key)) {
+                                            newPlannedSkills[savedPlannedSkillname].push(key);
+                                        }
+                                    }
+                                } else {
+                                    if (expectedParameters.includes(key)) {
+                                        logger.logDebug(
+                                            `Parameter: ${key} is declared in savedPlannedSkill: ${savedPlannedSkillname} but still failed to extract after ${attemptCount} attempts.`
+                                        );
+                                    } else {
+                                        logger.logDebug(
+                                            `Missing key: ${key} when build execution plan ${index}.${savedPlannedSkillname}. Need to provide the value during execution.`
+                                        );
+                                    }
+                                }
+                            } catch (error) {
+                                logger.logError(`Step building value assigning failed: ${error}`);
                             }
-                        } catch (error) {
-                            logger.logError(`Step building value assigning failed: ${error}`);
                         }
-                    });
+                    } else {
+                        logger.logDebug(
+                            `LLM did not return a valid JSON object for ${savedPlannedSkillname} after ${attemptCount} attempts.`
+                        );
+                    }
                 }
 
                 steps.push({
                     stepIndex: index,
-                    stepName: skillName,
-                    requiresAI: skill ? skill.requiresAI : false,
+                    stepName: savedPlannedSkillname,
+                    requiresAI: registeredSkill ? registeredSkill.requiresAI : false,
                     payload
                 });
             }
@@ -388,6 +380,26 @@ Workflow template will be set to inactive upon failure. To turn it off, set conf
             await taskRepository.addEvent(taskId, 'step_building_validated', steps);
             logger.logInfo('Step building validated successfully');
 
+            if (creatingNewWorkflow) {
+                let status = config.workflow.autoActivate
+                    ? taskRepository.constructor.WORKFLOW_STATUS.ACTIVE
+                    : taskRepository.constructor.WORKFLOW_STATUS.INACTIVE;
+
+                workflowId = await taskRepository.createWorkflowTemplate({
+                    normalizedRequestTemplate,
+                    plannedSkills: newPlannedSkills,
+                    source: workflowSource || 'restricted_planning',
+                    status
+                });
+
+                await taskRepository.addEvent(taskId, 'workflow_created', {
+                    workflowId,
+                    normalizedRequestTemplate,
+                    plannedSkills: newPlannedSkills
+                });
+
+                logger.logInfo(`Workflow created with id ${workflowId}`);
+            }
             await taskRepository.updateTaskStatus(
                 taskId,
                 taskRepository.constructor.TASK_STATUS.EXECUTING
@@ -534,7 +546,7 @@ Workflow template will be set to inactive upon failure. To turn it off, set conf
                 workflowId,
                 workflowSource,
                 normalizedRequestTemplate,
-                plan: plannedSkillNames,
+                plan: plannedSkills,
                 steps: context.stepResults.map((step) => ({
                     stepName: step.stepDefinition.stepName,
                     output: step.output,
