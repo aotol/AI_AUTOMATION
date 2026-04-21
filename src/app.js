@@ -126,9 +126,12 @@ async function main() {
     const engine = new TaskEngine(services);
     const result = await engine.runTask(rawInput);
 
-    if (result.status === 'completed') {
+    if (result.status === taskRepository.constructor.TASK_STATUS.COMPLETED) {
       logInfo('Final result:');
       console.log(JSON.stringify(result.finalOutput, null, 2));
+      process.exit(0);
+    } else if (result.status === taskRepository.constructor.TASK_STATUS.PAUSED) {
+      logInfo('Work paused.');
       process.exit(0);
     }
 

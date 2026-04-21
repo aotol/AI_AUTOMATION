@@ -21,7 +21,7 @@ class TaskRepository {
     this.getAsync = promisify(this.db.get.bind(this.db));
     this.allAsync = promisify(this.db.all.bind(this.db));
   }
-  
+
   runAsync(sql, params = []) {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function (error) {
@@ -43,6 +43,7 @@ class TaskRepository {
     PLANNING: 'planning',
     PLAN_VALIDATED: 'plan_validated',
     PLAN_FAILED: 'plan_failed',
+    PAUSED: 'paused',
     STEP_BUILDING: 'step_building',
     STEP_BUILDING_FAILED: 'step_building_failed',
     STEP_BUILDING_VALIDATED: 'step_building_validated',
@@ -74,13 +75,14 @@ class TaskRepository {
     const S = TaskRepository.TASK_STATUS;
     return {
       [S.RECEIVED]: [S.PLANNING],
-      [S.PLANNING]: [S.PLAN_VALIDATED, S.PLAN_FAILED],
+      [S.PLANNING]: [S.PLAN_VALIDATED, S.PLAN_FAILED, S.PAUSED],
       [S.PLAN_VALIDATED]: [S.STEP_BUILDING],
       [S.STEP_BUILDING]: [S.STEP_BUILDING_VALIDATED, S.STEP_BUILDING_FAILED],
       [S.STEP_BUILDING_VALIDATED]: [S.EXECUTING],
       [S.EXECUTING]: [S.COMPLETED, S.FAILED],
       [S.COMPLETED]: [],
       [S.FAILED]: [],
+      [S.PAUSED]: [],
       [S.PLAN_FAILED]: [],
       [S.STEP_BUILDING_FAILED]: []
     };
@@ -265,26 +267,40 @@ class TaskRepository {
   }
 
   async findActiveWorkflowByTemplate(normalizedRequestTemplate) {
+    return await findWorkflowByTemplate(normalizedRequestTemplate, TaskRepository.WORKFLOW_STATUS.ACTIVE);
+  }
+
+  async findWorkflowByTemplate(normalizedRequestTemplate, status) {
     if (!normalizedRequestTemplate || typeof normalizedRequestTemplate !== 'string') {
       return null;
     }
 
-    const row = await this.getAsync(
-      `SELECT
-         id,
-         normalized_request_template,
-         planned_skill_names_json,
-         source,
-         status,
-         created_at,
-         updated_at
-       FROM workflow_templates
-       WHERE normalized_request_template = ?
-         AND status = ?
-       ORDER BY id DESC
-       LIMIT 1`,
-      [normalizedRequestTemplate, TaskRepository.WORKFLOW_STATUS.ACTIVE]
-    );
+    let sql = `
+    SELECT
+      id,
+      normalized_request_template,
+      planned_skill_names_json,
+      source,
+      status,
+      created_at,
+      updated_at
+    FROM workflow_templates
+    WHERE normalized_request_template = ?
+  `;
+
+    const params = [normalizedRequestTemplate];
+
+    if (status !== undefined && status !== null) {
+      sql += ` AND status = ?`;
+      params.push(status);
+    }
+
+    sql += `
+    ORDER BY id DESC
+    LIMIT 1
+  `;
+
+    const row = await this.getAsync(sql, params);
 
     if (!row) {
       return null;

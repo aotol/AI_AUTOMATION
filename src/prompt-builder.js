@@ -26,7 +26,7 @@ function formatSkillDescription(skill, includeParameters) {
   if (includeParameters) {
     payloadDefinition = skill.payloadDefinition ? Object.entries(skill.payloadDefinition).map(
       function ([key, value]) {
-        return "'" + key + "': " + value;
+        return "\"" + key + "\": " + value;
       }).join(" "): "";
     }
     return `- ${name}: ${desc}${includeParameters ? ` Required parameters: [${payloadDefinition}]` : ''}`;
@@ -51,8 +51,8 @@ Task:
 ${rawInput}
 
 Example:
-If you extracted value for required parameters 'param_1' and 'pparam_2' for skill 'example_skill', your output JOSN should be:
-{'param_1': <param_1_value>, 'param_2': <param_2_value>}
+If you extracted value for required parameters "param_1" and "pparam_2" for skill "example_skill", your output JOSN should be:
+{"param_1": <param_1_value>, "param_2": <param_2_value>}
 `;
   return ensurePromptWithinLimit(prompt);
 }

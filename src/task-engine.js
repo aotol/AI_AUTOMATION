@@ -207,22 +207,51 @@ class TaskEngine {
             let workflowId = null;
             let workflowSource = null;
 
-            const existingWorkflow = await taskRepository.findActiveWorkflowByTemplate(normalizedRequestTemplate);
+            const existingWorkflow = await taskRepository.findWorkflowByTemplate(normalizedRequestTemplate);
 
-            if (existingWorkflow && Array.isArray(existingWorkflow.plannedSkillNames)) {
-                plannedSkillNames = existingWorkflow.plannedSkillNames;
-                workflowId = existingWorkflow.id;
-                workflowSource = 'workflow_cache';
+            if (existingWorkflow && Array.isArray(existingWorkflow.plannedSkillNames) && existingWorkflow.status != taskRepository.constructor.WORKFLOW_STATUS.REJECTED) {
+                if (existingWorkflow.status == taskRepository.constructor.WORKFLOW_STATUS.ACTIVE) {
+                    plannedSkillNames = existingWorkflow.plannedSkillNames;
+                    workflowId = existingWorkflow.id;
+                    workflowSource = 'workflow_cache';
 
-                await taskRepository.addEvent(taskId, 'planning_reused_workflow', {
-                    workflowId,
-                    normalizedRequestTemplate,
-                    plannedSkillNames
-                });
+                    await taskRepository.addEvent(taskId, 'planning_reused_workflow', {
+                        workflowId,
+                        normalizedRequestTemplate,
+                        plannedSkillNames
+                    });
 
-                logger.logInfo(
-                    `Reused workflow ${workflowId} for template: ${normalizedRequestTemplate}`
-                );
+                    logger.logInfo(
+                        `Reused workflow ${workflowId} for template: ${normalizedRequestTemplate}`
+                    );
+                } else if (existingWorkflow.status == taskRepository.constructor.WORKFLOW_STATUS.INACTIVE) {
+                    logger.logInfo(
+                        `Unapproved existing workflow template found:
+Workflow id: ${existingWorkflow.id}
+Pattern: ${existingWorkflow.normalizedRequestTemplate}
+Status: ${existingWorkflow.status}
+Workflow skill sequence: [${existingWorkflow.plannedSkillNames}]
+Please approve or reject this workflow template and try again.
+To approve, run: 'node app.js admin activate-workflow ${existingWorkflow.id}'
+To rejet, run: 'node app.js admin reject-workflow ${existingWorkflow.id}'
+To delete, run: 'node app.js admin delete-workflow ${existingWorkflow.id}'
+To turn on auto approval for new workflow templates, set config.json's workflow.autoActivate to true
+Workflow template will be set to inactive upon failure. To turn it off, set config.json's workflow.autoInactivate to false
+`
+                    );
+                    return {
+                        taskId,
+                        status: taskRepository.constructor.TASK_STATUS.PAUSED,
+                    };
+                } else {
+                    const unknownWorkflowError = `Unknow WORKFLOW_STATUS: ${existingWorkflow.status}`;
+                    logger.logError(unknownWorkflowError);
+                    return {
+                        taskId,
+                        status: taskRepository.constructor.TASK_STATUS.PLAN_FAILED,
+                        unknownWorkflowError
+                    };
+                }
             } else {
                 plannedSkillNames = await this.restrictedPlanningSolution(rawInput);
                 workflowSource = 'restricted_planning';
@@ -251,11 +280,7 @@ class TaskEngine {
                 await taskRepository.saveTaskError(taskId, error);
                 logger.logError(`Plan validation failed: ${error}`);
 
-                return {
-                    taskId,
-                    status: taskRepository.constructor.TASK_STATUS.PLAN_FAILED,
-                    error
-                };
+                return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.PLAN_FAILED, error, workflowId});
             }
 
             await taskRepository.saveTaskPlan(taskId, plannedSkillNames);
@@ -307,7 +332,7 @@ class TaskEngine {
                         await this.services.llmProvider.generateJson(fillPayloadParametersPrompt);
 
                     if (filledPayloadParameters && Object.keys(filledPayloadParameters) == 1 && filledPayloadParameters[skillName]) {
-                        //Sometimes the LLM may put he skill name as the top level JSON object
+                        //Sometimes the LLM may put the skill name as the top level JSON object
                         filledPayloadParameters = filledPayloadParameters[skillName];
                     }
 
@@ -353,11 +378,7 @@ class TaskEngine {
                 await taskRepository.saveTaskError(taskId, error);
                 logger.logError(`Step building validation failed: ${error}`);
 
-                return {
-                    taskId,
-                    status: taskRepository.constructor.TASK_STATUS.STEP_BUILDING_FAILED,
-                    error
-                };
+                return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.STEP_BUILDING_FAILED, error, workflowId});
             }
 
             await taskRepository.updateTaskStatus(
@@ -393,11 +414,7 @@ class TaskEngine {
                     await taskRepository.saveTaskError(taskId, error);
                     logger.logError(error);
 
-                    return {
-                        taskId,
-                        status: taskRepository.constructor.TASK_STATUS.FAILED,
-                        error
-                    };
+                    return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.FAILED, error, workflowId});
                 }
 
                 if (implementation.requiresAI !== stepDefinition.requiresAI) {
@@ -409,11 +426,7 @@ class TaskEngine {
                     await taskRepository.saveTaskError(taskId, error);
                     logger.logError(error);
 
-                    return {
-                        taskId,
-                        status: taskRepository.constructor.TASK_STATUS.FAILED,
-                        error
-                    };
+                    return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.FAILED, error, workflowId});
                 }
 
                 logger.logInfo(
@@ -464,11 +477,7 @@ class TaskEngine {
                     await taskRepository.saveTaskError(taskId, message);
                     logger.logError(message);
 
-                    return {
-                        taskId,
-                        status: taskRepository.constructor.TASK_STATUS.FAILED,
-                        error: message
-                    };
+                    return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.FAILED, error: message, workflowId});
                 }
 
                 const validation = await implementation.validate(
@@ -497,11 +506,7 @@ class TaskEngine {
                     await taskRepository.saveTaskError(taskId, message);
                     logger.logError(message);
 
-                    return {
-                        taskId,
-                        status: taskRepository.constructor.TASK_STATUS.FAILED,
-                        error: message
-                    };
+                    return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.FAILED, error: message, workflowId});
                 }
 
                 await taskRepository.updateStepStatus(
@@ -569,11 +574,7 @@ class TaskEngine {
             await taskRepository.saveTaskError(taskId, message);
             logger.logError(message);
 
-            return {
-                taskId,
-                status: taskRepository.constructor.TASK_STATUS.FAILED,
-                error: message
-            };
+            return await this.buildErrorReturnPackage({taskId, status: taskRepository.constructor.TASK_STATUS.FAILED, error: message, workflowId});
         }
     }
 
@@ -652,6 +653,21 @@ class TaskEngine {
         normalized = normalized.replace(/\s+/g, ' ').trim();
 
         return normalized.toLowerCase().trim();
+    }
+
+    async buildErrorReturnPackage({workflowId, taskId, status, error}) {
+        const {
+            taskRepository,
+        } = this.services;
+        if (workflowId && config.workflow.autoInactivate) {
+            await taskRepository.updateWorkflowStatus(workflowId, taskRepository.constructor.WORKFLOW_STATUS.INACTIVE);
+        }
+        let returnObject= {
+            taskId,
+            status,
+            error
+        }
+        return returnObject;
     }
 }
 

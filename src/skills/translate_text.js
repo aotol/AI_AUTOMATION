@@ -2,7 +2,7 @@ const { findPreviousOutputByKey, getLanguageFromText, getLanguageNameFromLanguag
 module.exports = {
   stepName: 'translate_text',
   requiresAI: true,
-  payloadDefinition: {text: 'The text provided by the task for translation.', targetLanguage: 'The language required to be translate into.'},
+  payloadDefinition: {text: 'The text provided by the task for translation.', targetLanguage: 'The language required to be translated into.'},
   description: 'Translate the text into the target language.',
   execute: async (context, services, stepDefinition) => {
     let sourceText;
@@ -33,6 +33,10 @@ module.exports = {
     : null;
 
     targetLanguage = getLanguageNameFromLanguageCode(targetLanguage);
+
+    if (!targetLanguage) {
+      throw new Error('translate_text step requires payload.targetLanguage or previous step output.');
+    }
 
     let language = await getLanguageFromText(sourceText);
     const detectedLanguageName = language.languageName;
